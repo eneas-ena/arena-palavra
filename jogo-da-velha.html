@@ -166,7 +166,7 @@
    v1.0.0
    ========================================================= */
 
-const VERSAO = "1.0.0";
+const VERSAO = "1.0.1";
 
 const REGRAS = `
   <h2>Como se joga</h2>
@@ -592,7 +592,8 @@ function minimax(casas, daVez, eu, prof){
 UI.iniciar({
   titulo:"Jogo da Velha",
   versao:VERSAO,
-  regras:REGRAS
+  regras:REGRAS,
+  voltar:"index.html"
 });
 
 $("#btnComecar").addEventListener("click", comecar);
