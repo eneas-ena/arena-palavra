@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0F1B33">
+<title>Jogo da Velha — Jogos da Palavra</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="comum.css">
+<style>
+/* ---------- placar ---------- */
+.placar{
+  display:flex;align-items:stretch;gap:10px;margin-bottom:16px;
+}
+.placar .lado{
+  flex:1;text-align:center;padding:11px 8px;border-radius:10px;
+  background:var(--surface);border:1px solid var(--linha);
+  transition:border-color .2s, background .2s;
+}
+.placar .lado.vez{
+  border-color:var(--cor-lado);
+  background:color-mix(in srgb, var(--cor-lado) 14%, var(--surface));
+}
+.placar .lado .quem{
+  display:block;font-family:'Cinzel',serif;font-size:13px;
+  color:var(--ink-dim);margin-bottom:4px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.placar .lado.vez .quem{color:var(--cor-lado)}
+.placar .lado .pontos{
+  font-size:29px;line-height:1;font-variant-numeric:tabular-nums;
+  font-family:'Cinzel',serif;color:var(--cor-lado);
+}
+.placar .meio{
+  align-self:center;font-size:13px;color:var(--ink-dim);
+  text-align:center;min-width:58px;line-height:1.25;
+}
+
+/* ---------- tabuleiro ---------- */
+.arena{position:relative;width:100%;max-width:380px;margin:0 auto}
+#grade{width:100%;aspect-ratio:1;display:block;overflow:visible}
+.hash{
+  stroke:var(--gold);stroke-width:3.4;stroke-linecap:round;
+  opacity:.85;
+  stroke-dasharray:1;stroke-dashoffset:1;
+  animation:tracar .6s ease-out forwards;
+}
+.hash:nth-of-type(2){animation-delay:.09s}
+.hash:nth-of-type(3){animation-delay:.18s}
+.hash:nth-of-type(4){animation-delay:.27s}
+@keyframes tracar{to{stroke-dashoffset:0}}
+
+.marca{stroke-linecap:round;fill:none;stroke-width:7;
+  stroke-dasharray:1;stroke-dashoffset:1;animation:tracar .34s ease-out forwards}
+.marca.dois{animation-delay:.2s}
+.marca-x{stroke:var(--carmim-claro)}
+.marca-o{stroke:var(--gold-soft)}
+
+.risco{
+  stroke:var(--ink);stroke-width:5.5;stroke-linecap:round;opacity:.9;
+  stroke-dasharray:1;stroke-dashoffset:1;animation:tracar .5s ease-out .25s forwards;
+}
+
+.casas{position:absolute;inset:0;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr)}
+.casa{
+  border-radius:12px;background:transparent;
+  transition:background .15s;
+  -webkit-tap-highlight-color:transparent;
+}
+.casa.livre:hover,.casa.livre:focus-visible{background:rgba(201,162,39,.11)}
+.casa.livre:active{background:rgba(201,162,39,.2)}
+.casa:disabled{cursor:default}
+.casa.alvo{background:rgba(201,162,39,.22)}
+
+@media (prefers-reduced-motion:reduce){
+  .hash,.marca,.risco{animation:none;stroke-dashoffset:0}
+}
+
+.resultado-rodada{
+  text-align:center;margin-top:16px;min-height:52px;
+}
+.resultado-rodada .frase{font-family:'Cinzel',serif;font-size:18px;margin:0 0 10px}
+.resultado-rodada .frase.venceu{color:var(--gold)}
+</style>
+</head>
+<body>
+
+<header></header>
+
+<main>
+
+<!-- ============ PREPARO ============ -->
+<section class="tela ativa" id="telaPreparo">
+  <div class="bloco">
+    <h2>Quem joga</h2>
+    <div class="escolhas" id="escModo"></div>
+  </div>
+
+  <div class="bloco">
+    <h2>Os jogadores</h2>
+    <div id="listaJogadores"></div>
+  </div>
+
+  <div class="bloco">
+    <h2>A partida</h2>
+    <div class="escolhas" id="escRodadas"></div>
+    <p class="legenda" style="margin:14px 0 0" id="legendaRodadas">—</p>
+  </div>
+
+  <button class="principal" id="btnComecar">Começar</button>
+</section>
+
+<!-- ============ JOGO ============ -->
+<section class="tela" id="telaJogo">
+  <div class="placar">
+    <div class="lado" id="ladoX"><span class="quem">—</span><span class="pontos">0</span></div>
+    <div class="meio" id="meioPlacar">—</div>
+    <div class="lado" id="ladoO"><span class="quem">—</span><span class="pontos">0</span></div>
+  </div>
+
+  <div class="arena">
+    <svg id="grade" viewBox="0 0 300 300" aria-hidden="true">
+      <g id="linhasHash">
+        <line class="hash" pathLength="1" x1="103" y1="18"  x2="103" y2="282"/>
+        <line class="hash" pathLength="1" x1="197" y1="18"  x2="197" y2="282"/>
+        <line class="hash" pathLength="1" x1="18"  y1="103" x2="282" y2="103"/>
+        <line class="hash" pathLength="1" x1="18"  y1="197" x2="282" y2="197"/>
+      </g>
+      <g id="marcas"></g>
+      <g id="risco"></g>
+    </svg>
+    <div class="casas" id="casas"></div>
+  </div>
+
+  <p class="aviso" id="aviso">—</p>
+
+  <div class="resultado-rodada" id="resultadoRodada"></div>
+
+  <button class="secundario" id="btnSair">Encerrar e voltar</button>
+</section>
+
+<!-- ============ FIM ============ -->
+<section class="tela" id="telaFim">
+  <div class="fim">
+    <h2 id="fimTitulo">—</h2>
+    <p class="legenda" id="fimSub">—</p>
+    <ol class="placar-lista" id="placarFinal"></ol>
+    <button class="principal" id="btnDeNovo">Jogar de novo</button>
+    <button class="secundario" id="btnVoltarPreparo">Mudar as opções</button>
+  </div>
+</section>
+
+</main>
+
+<script src="perguntas.js"></script>
+<script src="comum.js"></script>
+<script>
+"use strict";
+
+/* =========================================================
+   JOGO DA VELHA — Jogos da Palavra
+   Você escolhe a casa, depois responde. Acertou, marca.
+   Errou, a casa fica livre e a vez passa.
+   v1.0.0
+   ========================================================= */
+
+const VERSAO = "1.0.0";
+
+const REGRAS = `
+  <h2>Como se joga</h2>
+
+  <h3>O objetivo</h3>
+  <p>Formar uma fileira de três marcas suas: na horizontal, na vertical ou na diagonal.</p>
+
+  <h3>A jogada</h3>
+  <p>Escolha primeiro a casa que você quer. Só depois aparece a pergunta bíblica. Acertando, sua marca é desenhada ali. Errando, a casa continua livre e a vez passa para o outro — que pode tomar justamente aquela casa.</p>
+  <p>Escolher antes de saber a pergunta é o que dá graça: você aposta na casa e depois tenta merecê-la.</p>
+
+  <h3>Por que aqui ninguém empata sempre</h3>
+  <p>No jogo da velha comum, dois jogadores atentos empatam toda vez. Com a pergunta no meio, errar custa a jogada, e a partida volta a poder ser ganha.</p>
+
+  <h3>A partida</h3>
+  <p>Vence quem chegar primeiro ao número de rodadas combinado. A cada nova rodada, quem começa é o outro.</p>
+
+  <h3>Os níveis</h3>
+  <p>O nível muda duas coisas ao mesmo tempo: a dificuldade das perguntas que você recebe e, quando joga contra a máquina, o quanto ela joga bem e o quanto ela acerta as perguntas.</p>
+`;
+
+const LINHAS = [
+  [0,1,2],[3,4,5],[6,7,8],
+  [0,3,6],[1,4,7],[2,5,8],
+  [0,4,8],[2,4,6]
+];
+
+// centro de cada casa no sistema do SVG (300x300)
+const CENTROS = [
+  [58,58],[150,58],[242,58],
+  [58,150],[150,150],[242,150],
+  [58,242],[150,242],[242,242]
+];
+
+/* quanto a máquina joga bem no tabuleiro, por nível */
+const ESPERTEZA = {1:0.15, 2:0.60, 3:1.0};
+
+let cfg = {
+  modo:"maquina",              // "maquina" | "dupla"
+  alvo:3,                      // rodadas para vencer
+  jogadores:[
+    {marca:"X", nome:"Você",     tipo:"humano",  nivel:2},
+    {marca:"O", nome:"Máquina",  tipo:"maquina", nivel:2}
+  ]
+};
+
+let jogo = null;
+
+/* ---------------------------------------------------------
+   PREPARO
+   --------------------------------------------------------- */
+
+function montarPreparo(){
+  UI.escolhas($("#escModo"),
+    [{valor:"maquina", rotulo:"Contra a máquina"}, {valor:"dupla", rotulo:"Dois no aparelho"}],
+    cfg.modo, v => {
+      cfg.modo = v;
+      cfg.jogadores[1].tipo = (v === "maquina") ? "maquina" : "humano";
+      if(v === "maquina" && cfg.jogadores[1].nome === "Jogador 2") cfg.jogadores[1].nome = "Máquina";
+      if(v === "dupla"   && cfg.jogadores[1].nome === "Máquina")   cfg.jogadores[1].nome = "Jogador 2";
+      montarPreparo();
+    });
+
+  UI.escolhas($("#escRodadas"),
+    [{valor:1,rotulo:"1"},{valor:3,rotulo:"3"},{valor:5,rotulo:"5"}],
+    cfg.alvo, v => { cfg.alvo = v; montarPreparo(); });
+
+  $("#legendaRodadas").textContent = cfg.alvo === 1
+    ? "Uma rodada só decide tudo."
+    : "Vence quem ganhar " + cfg.alvo + " rodadas primeiro.";
+
+  const lista = $("#listaJogadores");
+  lista.innerHTML = "";
+  cfg.jogadores.forEach((j) => {
+    const linha = document.createElement("div");
+    linha.className = "jogador-linha";
+
+    const bola = document.createElement("span");
+    bola.className = "bolinha";
+    bola.style.background = j.marca === "X" ? "var(--carmim-claro)" : "var(--gold)";
+    bola.title = "Joga com " + j.marca;
+
+    const nome = document.createElement("input");
+    nome.type = "text"; nome.value = j.nome; nome.maxLength = 16;
+    nome.setAttribute("aria-label", "Nome de quem joga com " + j.marca);
+    nome.addEventListener("input", () => { j.nome = nome.value.trim() || ("Jogador " + j.marca); });
+
+    const nivel = document.createElement("select");
+    nivel.setAttribute("aria-label", "Nível de " + j.nome);
+    [[1,"Fácil"],[2,"Médio"],[3,"Difícil"]].forEach(([v,t]) => {
+      const o = document.createElement("option"); o.value = v; o.textContent = t;
+      if(v === j.nivel) o.selected = true; nivel.appendChild(o);
+    });
+    nivel.addEventListener("change", () => { j.nivel = Number(nivel.value); });
+
+    linha.append(bola, nome, nivel);
+    lista.appendChild(linha);
+  });
+}
+
+/* ---------------------------------------------------------
+   PARTIDA
+   --------------------------------------------------------- */
+
+function comecar(){
+  Banco.zerar();
+  jogo = {
+    pontos:{X:0, O:0},
+    rodada:1,
+    comeca:"X",
+    casas:Array(9).fill(null),
+    vez:"X",
+    fase:"escolher",
+    pendente:null
+  };
+  UI.trocarTela("telaJogo");
+  montarCasas();
+  novaRodada(true);
+}
+
+function jogadorDe(marca){ return cfg.jogadores.find(j => j.marca === marca); }
+
+function montarCasas(){
+  const cx = $("#casas");
+  cx.innerHTML = "";
+  for(let i = 0; i < 9; i++){
+    const b = document.createElement("button");
+    b.className = "casa";
+    b.dataset.i = i;
+    b.setAttribute("aria-label", "Casa " + (i+1));
+    b.addEventListener("click", () => escolherCasa(i));
+    cx.appendChild(b);
+  }
+}
+
+function novaRodada(primeira){
+  jogo.casas = Array(9).fill(null);
+  jogo.vez = jogo.comeca;
+  jogo.fase = "escolher";
+  jogo.pendente = null;
+  $("#marcas").innerHTML = "";
+  $("#risco").innerHTML = "";
+  $("#resultadoRodada").innerHTML = "";
+  if(!primeira){
+    // redesenha o hash para a animação acontecer de novo
+    const g = $("#linhasHash");
+    g.innerHTML = g.innerHTML;
+  }
+  atualizarPlacar();
+  seguirVez();
+}
+
+function atualizarPlacar(){
+  const jx = jogadorDe("X"), jo = jogadorDe("O");
+  const lx = $("#ladoX"), lo = $("#ladoO");
+  lx.style.setProperty("--cor-lado", "var(--carmim-claro)");
+  lo.style.setProperty("--cor-lado", "var(--gold-soft)");
+  $(".quem", lx).textContent = jx.nome;
+  $(".quem", lo).textContent = jo.nome;
+  $(".pontos", lx).textContent = jogo.pontos.X;
+  $(".pontos", lo).textContent = jogo.pontos.O;
+  lx.classList.toggle("vez", jogo.vez === "X");
+  lo.classList.toggle("vez", jogo.vez === "O");
+  $("#meioPlacar").innerHTML = cfg.alvo === 1
+    ? "rodada<br>única"
+    : "rodada " + jogo.rodada + "<br>até " + cfg.alvo;
+}
+
+function seguirVez(){
+  atualizarPlacar();
+  const j = jogadorDe(jogo.vez);
+
+  if(j.tipo === "maquina"){
+    travarCasas(true);
+    avisar(j.nome + " está pensando…");
+    setTimeout(jogadaDaMaquina, 750);
+  } else {
+    travarCasas(false);
+    avisar(j.nome + ", escolha uma casa.");
+  }
+}
+
+function travarCasas(travar){
+  $$("#casas .casa").forEach((b, i) => {
+    const livre = jogo.casas[i] === null;
+    b.disabled = travar || !livre;
+    b.classList.toggle("livre", !travar && livre);
+    b.classList.remove("alvo");
+  });
+}
+
+function avisar(txt){ $("#aviso").textContent = txt || ""; }
+
+/* ---------- a jogada ---------- */
+
+function escolherCasa(i){
+  if(jogo.fase !== "escolher") return;
+  if(jogo.casas[i] !== null) return;
+
+  jogo.fase = "respondendo";
+  jogo.pendente = i;
+  Som.toque();
+  $$("#casas .casa")[i].classList.add("alvo");
+  travarCasas(true);
+
+  const j = jogadorDe(jogo.vez);
+  Pergunta.abrir({
+    para: j.nome,
+    nivel: j.nivel,
+    texto: (acertou) => acertou
+      ? "Resposta certa. A casa é sua."
+      : "Resposta errada. A casa fica livre e a vez passa.",
+    aoResponder: (acertou) => resolver(acertou)
+  });
+}
+
+function jogadaDaMaquina(){
+  const j = jogadorDe(jogo.vez);
+  const i = escolhaDaMaquina(j);
+  jogo.pendente = i;
+  $$("#casas .casa")[i].classList.add("alvo");
+  Som.toque();
+
+  const acertou = Math.random() < ACERTO_MAQUINA[j.nivel];
+  setTimeout(() => {
+    if(acertou) Som.acerto(); else Som.erro();
+    avisar(j.nome + (acertou ? " acertou a pergunta." : " errou a pergunta."));
+    setTimeout(() => resolver(acertou), 900);
+  }, 550);
+}
+
+function resolver(acertou){
+  const i = jogo.pendente;
+  $$("#casas .casa").forEach(b => b.classList.remove("alvo"));
+
+  if(acertou){
+    jogo.casas[i] = jogo.vez;
+    desenharMarca(i, jogo.vez);
+    Som.marcar();
+  }
+
+  const venc = vencedor(jogo.casas);
+  if(venc){ return setTimeout(() => fimDaRodada(venc.marca, venc.linha), 700); }
+  if(jogo.casas.every(c => c !== null)){ return setTimeout(() => fimDaRodada(null, null), 700); }
+
+  jogo.vez = jogo.vez === "X" ? "O" : "X";
+  jogo.fase = "escolher";
+  setTimeout(seguirVez, 350);
+}
+
+function vencedor(casas){
+  for(const l of LINHAS){
+    const [a,b,c] = l;
+    if(casas[a] && casas[a] === casas[b] && casas[a] === casas[c])
+      return {marca:casas[a], linha:l};
+  }
+  return null;
+}
+
+/* ---------- desenho ---------- */
+
+function svgEl(tag, attrs){
+  const e = document.createElementNS("http://www.w3.org/2000/svg", tag);
+  for(const k in attrs) e.setAttribute(k, attrs[k]);
+  return e;
+}
+
+function desenharMarca(i, marca){
+  const [cx, cy] = CENTROS[i];
+  const g = $("#marcas");
+  const r = 30;
+
+  if(marca === "X"){
+    // dois traços ligeiramente tortos, como feitos à mão
+    const t = 3;
+    g.appendChild(svgEl("line", {
+      class:"marca marca-x", pathLength:1,
+      x1:cx-r, y1:cy-r+t, x2:cx+r, y2:cy+r
+    }));
+    g.appendChild(svgEl("line", {
+      class:"marca marca-x dois", pathLength:1,
+      x1:cx+r-t, y1:cy-r, x2:cx-r, y2:cy+r-t
+    }));
+  } else {
+    // círculo aberto num ponto, como quem desenha sem fechar direito
+    const a0 = -0.35, a1 = a0 + Math.PI * 1.93;
+    const p1 = [cx + r*Math.cos(a0), cy + r*Math.sin(a0)];
+    const p2 = [cx + r*Math.cos(a1), cy + r*Math.sin(a1)];
+    g.appendChild(svgEl("path", {
+      class:"marca marca-o", pathLength:1,
+      d:"M " + p1[0].toFixed(1) + " " + p1[1].toFixed(1) +
+        " A " + r + " " + r + " 0 1 1 " + p2[0].toFixed(1) + " " + p2[1].toFixed(1)
+    }));
+  }
+}
+
+function riscarLinha(linha){
+  const [a,,c] = linha;
+  const p1 = CENTROS[a], p2 = CENTROS[c];
+  // estende um pouco para fora das marcas
+  const dx = p2[0]-p1[0], dy = p2[1]-p1[1];
+  const comp = Math.hypot(dx,dy) || 1;
+  const ex = (dx/comp) * 26, ey = (dy/comp) * 26;
+  $("#risco").appendChild(svgEl("line", {
+    class:"risco", pathLength:1,
+    x1:p1[0]-ex, y1:p1[1]-ey, x2:p2[0]+ex, y2:p2[1]+ey
+  }));
+}
+
+/* ---------- fim de rodada e de partida ---------- */
+
+function fimDaRodada(marca, linha){
+  jogo.fase = "parado";
+  travarCasas(true);
+  avisar("");
+
+  const cx = $("#resultadoRodada");
+  const frase = document.createElement("p");
+  frase.className = "frase";
+
+  if(marca){
+    riscarLinha(linha);
+    jogo.pontos[marca]++;
+    frase.textContent = jogadorDe(marca).nome + " ganhou a rodada";
+    frase.classList.add("venceu");
+    Som.chegou();
+  } else {
+    frase.textContent = "Deu velha";
+    Som.empate();
+  }
+
+  atualizarPlacar();
+  cx.appendChild(frase);
+
+  const acabou = jogo.pontos.X >= cfg.alvo || jogo.pontos.O >= cfg.alvo;
+  if(acabou) return setTimeout(fimDaPartida, 1400);
+
+  const b = document.createElement("button");
+  b.className = "principal";
+  b.textContent = "Próxima rodada";
+  b.addEventListener("click", () => {
+    jogo.rodada++;
+    jogo.comeca = jogo.comeca === "X" ? "O" : "X";
+    novaRodada(false);
+  });
+  cx.appendChild(b);
+  b.focus();
+}
+
+function fimDaPartida(){
+  const campeaoMarca = jogo.pontos.X > jogo.pontos.O ? "X" : "O";
+  const campeao = jogadorDe(campeaoMarca);
+  Som.vitoria();
+
+  $("#fimTitulo").textContent = campeao.nome + " venceu";
+  $("#fimSub").textContent = jogo.pontos.X + " a " + jogo.pontos.O +
+    " em " + jogo.rodada + (jogo.rodada === 1 ? " rodada" : " rodadas");
+
+  const ol = $("#placarFinal");
+  ol.innerHTML = "";
+  ["X","O"].sort((a,b) => jogo.pontos[b] - jogo.pontos[a]).forEach(m => {
+    const li = document.createElement("li");
+    const bola = document.createElement("span");
+    bola.className = "bolinha";
+    bola.style.background = m === "X" ? "var(--carmim-claro)" : "var(--gold)";
+    const nome = document.createElement("span");
+    nome.textContent = jogadorDe(m).nome;
+    const pts = document.createElement("span");
+    pts.style.flex = "0"; pts.style.color = "var(--ink-dim)";
+    pts.textContent = jogo.pontos[m];
+    li.append(bola, nome, pts);
+    ol.appendChild(li);
+  });
+
+  UI.trocarTela("telaFim");
+}
+
+/* ---------------------------------------------------------
+   A MÁQUINA
+   Joga perfeito no nível difícil. Nos níveis mais fáceis,
+   às vezes joga a esmo de propósito — senão nunca perde.
+   --------------------------------------------------------- */
+
+function escolhaDaMaquina(j){
+  const livres = jogo.casas.map((c,i) => c === null ? i : -1).filter(i => i >= 0);
+  if(Math.random() > ESPERTEZA[j.nivel]){
+    return livres[Math.floor(Math.random() * livres.length)];
+  }
+
+  const eu = jogo.vez, ele = eu === "X" ? "O" : "X";
+  let melhor = -Infinity, escolha = livres[0];
+
+  for(const i of livres){
+    const copia = jogo.casas.slice();
+    copia[i] = eu;
+    const nota = minimax(copia, ele, eu, 1);
+    if(nota > melhor){ melhor = nota; escolha = i; }
+  }
+  return escolha;
+}
+
+function minimax(casas, daVez, eu, prof){
+  const v = vencedor(casas);
+  if(v) return v.marca === eu ? (10 - prof) : (prof - 10);
+  const livres = casas.map((c,i) => c === null ? i : -1).filter(i => i >= 0);
+  if(livres.length === 0) return 0;
+
+  const outro = daVez === "X" ? "O" : "X";
+  let melhor = daVez === eu ? -Infinity : Infinity;
+  for(const i of livres){
+    const copia = casas.slice();
+    copia[i] = daVez;
+    const nota = minimax(copia, outro, eu, prof + 1);
+    melhor = daVez === eu ? Math.max(melhor, nota) : Math.min(melhor, nota);
+  }
+  return melhor;
+}
+
+/* ---------------------------------------------------------
+   LIGAÇÕES
+   --------------------------------------------------------- */
+
+UI.iniciar({
+  titulo:"Jogo da Velha",
+  versao:VERSAO,
+  regras:REGRAS
+});
+
+$("#btnComecar").addEventListener("click", comecar);
+$("#btnSair").addEventListener("click", () => UI.trocarTela("telaPreparo"));
+$("#btnDeNovo").addEventListener("click", comecar);
+$("#btnVoltarPreparo").addEventListener("click", () => UI.trocarTela("telaPreparo"));
+
+montarPreparo();
+</script>
+</body>
+</html>

@@ -1,0 +1,151 @@
+/* =========================================================
+   JOGOS DA PALAVRA — estilo compartilhado
+   Usado por todos os jogos do kit. Mexeu aqui, mudou em todos.
+   comum.css v1.0.0
+   ========================================================= */
+
+:root{
+  --navy:#0F1B33; --navy-deep:#0A1425;
+  --gold:#C9A227; --gold-soft:#E0BE55;
+  --carmim:#A62B33; --carmim-claro:#D4565F;
+  --ambar:#D99A1E; --safira:#2A5B9C; --esmeralda:#2E6B4F;
+
+  --bg:#0A1425; --surface:#0F1B33; --surface-2:#16264A;
+  --ink:#F2EDE1; --ink-dim:#A9B4C7; --linha:#2A3A57;
+  --casa:#F3EFE4; --casa-borda:#C3B99F;
+}
+[data-tema="claro"]{
+  --bg:#EDE8DC; --surface:#F6F2E8; --surface-2:#E3DCCB;
+  --ink:#101C33; --ink-dim:#5A6478; --linha:#CFC5AE;
+  --casa:#FFFDF7; --casa-borda:#B9AE92;
+  --gold-soft:#8F7318;
+  --carmim-claro:#A62B33;
+}
+
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg); color:var(--ink);
+  font-family:'Cormorant Garamond',Georgia,serif; font-size:18px; line-height:1.5;
+  -webkit-text-size-adjust:100%;
+  padding:0 0 env(safe-area-inset-bottom);
+}
+h1,h2,h3,.cinzel{font-family:'Cinzel',Georgia,serif;font-weight:600;letter-spacing:.02em}
+button{font-family:inherit;font-size:inherit;cursor:pointer;border:none;background:none;color:inherit}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+
+/* ---------- cabeçalho ---------- */
+header{
+  display:flex;align-items:center;gap:7px;
+  padding:14px 12px;
+  padding-top:calc(14px + env(safe-area-inset-top));
+  border-bottom:1px solid var(--linha);
+  background:var(--surface);
+}
+header h1{font-size:17px;margin:0;flex:1;color:var(--gold);min-width:0}
+header .voltar{
+  font-size:20px;color:var(--ink-dim);padding:0 4px;text-decoration:none;line-height:1;
+}
+.versao{font-size:12px;color:var(--ink-dim);font-variant-numeric:tabular-nums;margin-right:2px}
+.icone-btn{
+  width:34px;height:34px;border-radius:50%;border:1px solid var(--linha);
+  display:grid;place-items:center;font-size:15px;background:var(--surface-2);
+  flex-shrink:0;line-height:1;
+}
+.icone-btn[aria-pressed="false"]{opacity:.45}
+
+/* ---------- estrutura ---------- */
+main{max-width:560px;margin:0 auto;padding:18px 16px 40px}
+.tela{display:none}
+.tela.ativa{display:block}
+
+.bloco{
+  background:var(--surface);border:1px solid var(--linha);
+  border-radius:10px;padding:16px;margin-bottom:14px;
+}
+.bloco h2{font-size:15px;margin:0 0 12px;color:var(--gold)}
+.legenda{color:var(--ink-dim);font-size:15px;margin:0 0 14px}
+
+.escolhas{display:flex;gap:8px;flex-wrap:wrap}
+.escolha{
+  flex:1;min-width:56px;padding:11px 6px;border-radius:8px;
+  border:1px solid var(--linha);background:var(--surface-2);
+  text-align:center;font-size:17px;
+}
+.escolha[aria-pressed="true"]{
+  background:var(--gold);color:#0A1425;border-color:var(--gold);font-weight:600;
+}
+
+.opcao{display:flex;align-items:flex-start;gap:11px;padding:9px 0}
+.opcao input{margin-top:5px;width:19px;height:19px;accent-color:var(--gold);flex-shrink:0}
+.opcao span{font-size:16px}
+.opcao small{display:block;color:var(--ink-dim);font-size:14px;line-height:1.35}
+
+.principal{
+  display:block;width:100%;padding:15px;border-radius:9px;
+  background:var(--gold);color:#0A1425;font-family:'Cinzel',serif;
+  font-weight:600;font-size:16px;letter-spacing:.03em;
+}
+.principal:disabled{opacity:.4;cursor:default}
+.secundario{
+  display:block;width:100%;padding:12px;border-radius:9px;margin-top:10px;
+  border:1px solid var(--linha);color:var(--ink-dim);font-size:16px;
+}
+.aviso{text-align:center;font-size:16px;color:var(--ink-dim);min-height:24px;margin-top:10px}
+
+/* ---------- linha de jogador (preparo) ---------- */
+.jogador-linha{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--linha)}
+.jogador-linha:first-of-type{border-top:none}
+.bolinha{width:20px;height:20px;border-radius:50%;flex-shrink:0;border:2px solid rgba(255,255,255,.35)}
+.jogador-linha input[type=text]{
+  flex:1;min-width:0;background:transparent;border:none;border-bottom:1px solid var(--linha);
+  color:var(--ink);padding:5px 2px;font-size:17px;
+}
+.jogador-linha select{
+  background:var(--surface-2);color:var(--ink);border:1px solid var(--linha);
+  border-radius:6px;padding:6px 4px;font-size:15px;max-width:120px;
+}
+
+/* ---------- cortinas (pergunta e regras) ---------- */
+.cortina{
+  position:fixed;inset:0;background:rgba(6,12,24,.82);
+  display:none;align-items:center;justify-content:center;padding:18px;z-index:40;
+}
+.cortina.ativa{display:flex}
+.cartao{
+  background:var(--surface);border:1px solid var(--gold);border-radius:12px;
+  padding:20px;max-width:460px;width:100%;max-height:88vh;overflow-y:auto;
+}
+.cartao .de-quem{font-size:14px;color:var(--ink-dim);margin:0 0 4px}
+.cartao .nivel{font-size:13px;color:var(--gold);margin:0 0 14px}
+.cartao .enunciado{font-size:21px;line-height:1.35;margin:0 0 18px}
+.alternativa{
+  display:block;width:100%;text-align:left;padding:12px 14px;margin-bottom:8px;
+  border:1px solid var(--linha);border-radius:8px;background:var(--surface-2);font-size:17px;
+}
+.alternativa:disabled{cursor:default;opacity:.55}
+.alternativa.certa{background:#1E5B3C;border-color:#3E9268;color:#F2EDE1;opacity:1}
+.alternativa.errada{background:#6B1F26;border-color:#A6414A;color:#F2EDE1;opacity:1}
+.resultado{margin-top:14px;padding-top:14px;border-top:1px solid var(--linha)}
+.resultado p{margin:0 0 6px;font-size:17px}
+.resultado .ref{color:var(--gold);font-size:15px}
+
+.cartao.regras h2{font-size:19px;margin:0 0 4px;color:var(--gold)}
+.cartao.regras h3{
+  font-size:14px;margin:20px 0 5px;color:var(--gold-soft);
+  border-top:1px solid var(--linha);padding-top:14px;
+}
+.cartao.regras h3:first-of-type{border-top:none;margin-top:14px;padding-top:0}
+.cartao.regras p{margin:0 0 8px;font-size:17px;line-height:1.45}
+.cartao.regras ul{margin:10px 0;padding-left:20px}
+.cartao.regras li{margin-bottom:6px;font-size:17px}
+
+/* ---------- placar / fim ---------- */
+.fim{text-align:center;padding:30px 0}
+.fim h2{font-size:24px;margin:0 0 6px}
+.placar-lista{list-style:none;padding:0;margin:20px 0;text-align:left}
+.placar-lista li{
+  display:flex;align-items:center;gap:10px;padding:9px 0;
+  border-top:1px solid var(--linha);font-size:17px;
+}
+.placar-lista li span{flex:1}
