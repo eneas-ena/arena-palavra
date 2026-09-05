@@ -1,5 +1,5 @@
 /* =========================================================
-   JOGOS DA PALAVRA — motor compartilhado
+   ARENA DA PALAVRA — motor compartilhado
    Som, tema claro/escuro, cabeçalho, cortina de pergunta e de regras.
    Corrigiu um som aqui, corrigiu em todos os jogos do kit.
    comum.js v1.0.0
@@ -106,7 +106,7 @@ const UI = {
       document.createElement("header"), document.body.firstChild);
 
     cab.innerHTML =
-      (op.voltar ? '<a class="voltar" href="' + op.voltar + '" aria-label="Voltar ao kit">‹</a>' : '') +
+      (op.voltar ? '<a class="voltar" href="' + op.voltar + '" aria-label="Voltar à Arena">‹</a>' : '') +
       '<h1>' + op.titulo + '</h1>' +
       '<span class="versao">v' + op.versao + '</span>' +
       (op.regras ? '<button class="icone-btn" id="btnRegras" aria-label="Ver as regras">?</button>' : '') +

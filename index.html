@@ -4,13 +4,26 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0F1B33">
-<title>Jogos da Palavra</title>
+<title>Arena da Palavra</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="32x32" href="icone-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icone-192.png">
+<link rel="apple-touch-icon" href="icone-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Arena da Palavra">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="comum.css">
 <style>
-.abertura{text-align:center;padding:8px 0 26px}
+.abertura{text-align:center;padding:4px 0 26px}
+.brasao{
+  width:150px;height:150px;max-width:44vw;border-radius:26px;
+  display:block;margin:0 auto 16px;
+  box-shadow:0 10px 30px rgba(0,0,0,.42);
+}
+[data-tema="claro"] .brasao{box-shadow:0 8px 24px rgba(16,28,51,.24)}
 .abertura p{color:var(--ink-dim);font-size:18px;margin:0;max-width:34ch;margin-inline:auto;line-height:1.4}
 
 .prateleira{display:grid;gap:12px}
@@ -51,6 +64,7 @@
 
 <main>
   <div class="abertura">
+    <img class="brasao" src="icone-512.png" alt="Arena da Palavra" width="150" height="150">
     <p>Jogos de tabuleiro em que só avança quem conhece a Palavra.</p>
   </div>
 
@@ -135,7 +149,7 @@
 <script src="comum.js"></script>
 <script>
 "use strict";
-UI.iniciar({ titulo:"Jogos da Palavra", versao:"1.0.0" });
+UI.iniciar({ titulo:"Arena da Palavra", versao:"1.1.0" });
 </script>
 </body>
 </html>

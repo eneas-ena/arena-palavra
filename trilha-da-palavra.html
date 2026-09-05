@@ -4,7 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0F1B33">
-<title>Trilha da Palavra</title>
+<title>Trilha da Palavra — Arena da Palavra</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="32x32" href="icone-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icone-192.png">
+<link rel="apple-touch-icon" href="icone-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Arena da Palavra">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
@@ -259,9 +266,9 @@ main{max-width:560px;margin:0 auto;padding:18px 16px 40px}
 <body data-tema="escuro">
 
 <header>
-  <a class="voltar" href="index.html" aria-label="Voltar aos jogos">‹</a>
+  <a class="voltar" href="index.html" aria-label="Voltar à Arena">‹</a>
   <h1>Trilha da Palavra</h1>
-  <span class="versao">v1.1.1</span>
+  <span class="versao">v1.1.2</span>
   <button class="icone-btn" id="btnRegras" aria-label="Ver as regras">?</button>
   <button class="icone-btn" id="btnSom" aria-label="Desligar o som">🔊</button>
   <button class="icone-btn" id="btnTema" aria-label="Alternar tema claro e escuro">☀️</button>
@@ -403,7 +410,7 @@ main{max-width:560px;margin:0 auto;padding:18px 16px 40px}
    Fase 2 (a fazer): sincronia entre celulares via Supabase Realtime.
    ======================================================================= */
 
-const VERSAO = "1.1.1";
+const VERSAO = "1.1.2";
 
 /* ----------------------------------------------------------------------
    0. SOM

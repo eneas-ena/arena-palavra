@@ -1,5 +1,5 @@
 /* =========================================================
-   JOGOS DA PALAVRA — banco de perguntas compartilhado
+   ARENA DA PALAVRA — banco de perguntas compartilhado
    514 perguntas: 160 fáceis, 169 médias, 185 difíceis.
 
    Formato:  n = nível (1 fácil, 2 médio, 3 difícil)
