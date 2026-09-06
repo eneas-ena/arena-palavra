@@ -47,6 +47,41 @@ const Sala = {
 
   usarTransporte(t){ this.transporte = t; },
 
+  /* A biblioteca do Supabase é buscada só quando alguém abre ou entra
+     numa sala. Quem está jogando sozinho ou lado a lado nunca a baixa. */
+  carregarBiblioteca(){
+    if(window.supabase) return Promise.resolve();
+    if(this._carregando) return this._carregando;
+    this._carregando = new Promise((pronto, falhou) => {
+      const tag = document.createElement("script");
+      tag.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
+      tag.onload = () => window.supabase
+        ? pronto()
+        : falhou(new Error("a biblioteca carregou mas não se apresentou"));
+      tag.onerror = () => falhou(new Error("não deu para baixar a biblioteca do Supabase"));
+      document.head.appendChild(tag);
+    });
+    return this._carregando;
+  },
+
+  /* Abre um canal só para conferir se o endereço e a chave estão certos. */
+  async testar(){
+    if(!this.configurada()) throw new Error("falta preencher o endereço e a chave em sala.js");
+    await this.carregarBiblioteca();
+    const cliente = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+    return new Promise((pronto, falhou) => {
+      const prazo = setTimeout(() => falhou(new Error("o Supabase não respondeu em 8 segundos")), 8000);
+      const canal = cliente.channel("arena-teste-" + Math.random().toString(36).slice(2));
+      canal.subscribe((status, erro) => {
+        if(status === "SUBSCRIBED"){ clearTimeout(prazo); canal.unsubscribe(); pronto(); }
+        else if(status === "CHANNEL_ERROR" || status === "TIMED_OUT"){
+          clearTimeout(prazo); canal.unsubscribe();
+          falhou(new Error(status === "TIMED_OUT" ? "a conexão expirou" : ("o canal recusou" + (erro ? ": " + erro.message : ""))));
+        }
+      });
+    });
+  },
+
   criarTransporteSupabase(){
     if(!this.configurada()) throw new Error("Supabase não configurado em sala.js");
     if(!window.supabase) throw new Error("A biblioteca do Supabase não carregou");
@@ -92,7 +127,10 @@ const Sala = {
     this.ganchos = ganchos || {};
     this.versao = 0;
 
-    if(!this.transporte) this.transporte = this.criarTransporteSupabase();
+    if(!this.transporte){
+      await this.carregarBiblioteca();
+      this.transporte = this.criarTransporteSupabase();
+    }
 
     await this.transporte.abrir(codigo,
       (msg) => this.receber(msg),
@@ -184,10 +222,30 @@ const Sala = {
         const p = document.createElement("p");
         p.className = "legenda";
         p.style.margin = "0";
-        p.textContent = "Para jogar entre aparelhos é preciso preencher o endereço e a chave do Supabase no arquivo sala.js.";
+        p.textContent = "Para jogar entre aparelhos é preciso preencher o endereço e a chave do Supabase nas duas primeiras linhas do arquivo sala.js.";
         corpo.appendChild(p);
         return;
       }
+
+      const teste = document.createElement("button");
+      teste.className = "secundario";
+      teste.style.marginTop = "0";
+      teste.textContent = "Testar a conexão";
+      const resultado = document.createElement("p");
+      resultado.className = "legenda";
+      resultado.style.margin = "8px 0 14px";
+      teste.addEventListener("click", async () => {
+        teste.disabled = true;
+        resultado.textContent = "Conferindo…";
+        try {
+          await this.testar();
+          resultado.textContent = "Conexão certa: o Supabase respondeu.";
+        } catch(e){
+          resultado.textContent = "Não conectou — " + e.message;
+        }
+        teste.disabled = false;
+      });
+      corpo.append(teste, resultado);
 
       if(modo === "criar"){
         const codigo = this.gerarCodigo();
