@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0F1B33">
+<title>Forca — Arena da Palavra</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="32x32" href="icone-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icone-192.png">
+<link rel="apple-touch-icon" href="icone-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Arena da Palavra">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="comum.css">
+<style>
+/* ---------- topo da partida ---------- */
+.faixa{
+  display:flex;align-items:center;gap:10px;margin-bottom:14px;
+  padding:11px 13px;border-radius:9px;
+  background:var(--surface);border:1px solid var(--linha);
+  border-left:5px solid var(--vez-cor,var(--gold));
+}
+.faixa .quem{flex:1;min-width:0}
+.faixa .nome{font-family:'Cinzel',serif;font-size:15px;display:block}
+.faixa .sub{font-size:15px;color:var(--ink-dim)}
+.faixa .vidas{font-size:17px;letter-spacing:2px;flex-shrink:0}
+
+/* ---------- forca ---------- */
+.cena{display:flex;align-items:center;gap:14px;margin-bottom:6px}
+#forca{width:44%;max-width:190px;flex-shrink:0}
+.viga{stroke:var(--gold);stroke-width:5;stroke-linecap:round;fill:none;opacity:.85;
+  stroke-dasharray:1;stroke-dashoffset:1;animation:tracar .5s ease-out forwards}
+.viga:nth-of-type(2){animation-delay:.08s}
+.viga:nth-of-type(3){animation-delay:.16s}
+.viga:nth-of-type(4){animation-delay:.24s}
+.corpo{stroke:var(--carmim-claro);stroke-width:5.5;stroke-linecap:round;fill:none;
+  stroke-dasharray:1;stroke-dashoffset:1;animation:tracar .4s ease-out forwards}
+@keyframes tracar{to{stroke-dashoffset:0}}
+@media (prefers-reduced-motion:reduce){.viga,.corpo{animation:none;stroke-dashoffset:0}}
+
+.pista{flex:1;min-width:0}
+.pista .rotulo{font-family:'Cinzel',serif;font-size:12px;color:var(--gold);display:block;margin-bottom:5px}
+.pista .categoria{font-size:19px;line-height:1.3;margin:0 0 10px}
+.pista .revelada{
+  font-size:16px;line-height:1.35;color:var(--ink-dim);margin:0;
+  padding-top:10px;border-top:1px solid var(--linha);
+}
+
+/* ---------- a palavra ---------- */
+.palavra{
+  display:flex;justify-content:center;flex-wrap:wrap;gap:6px;
+  margin:18px 0 16px;min-height:56px;
+}
+.letra{
+  width:34px;height:46px;display:grid;place-items:center;
+  font-family:'Cinzel',serif;font-size:24px;
+  border-bottom:3px solid var(--gold);
+}
+.letra.cheia{animation:surge .3s ease-out}
+.letra.entregue{color:var(--carmim-claro)}
+@keyframes surge{from{opacity:0;transform:translateY(-8px)}}
+@media (prefers-reduced-motion:reduce){.letra.cheia{animation:none}}
+
+/* ---------- teclado ---------- */
+.teclado{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:14px}
+.tecla{
+  padding:11px 0;border-radius:7px;border:1px solid var(--linha);
+  background:var(--surface-2);font-family:'Cinzel',serif;font-size:16px;
+}
+.tecla:not(:disabled):active{background:var(--gold);color:#0A1425}
+.tecla.certa{background:#1E5B3C;border-color:#3E9268;color:#F2EDE1}
+.tecla.errada{background:#6B1F26;border-color:#A6414A;color:#F2EDE1;opacity:.6}
+.tecla:disabled{cursor:default}
+
+.socorros{display:flex;gap:8px;margin-bottom:12px}
+.socorro{
+  flex:1;padding:11px 8px;border-radius:8px;border:1px solid var(--gold);
+  color:var(--gold);font-size:15px;text-align:center;line-height:1.25;
+}
+.socorro small{display:block;color:var(--ink-dim);font-size:13px}
+.socorro:disabled{opacity:.35;cursor:default}
+
+.desfecho{text-align:center;margin-top:14px}
+.desfecho .frase{font-family:'Cinzel',serif;font-size:19px;margin:0 0 4px}
+.desfecho .frase.ganhou{color:var(--gold)}
+.desfecho .era{font-size:17px;color:var(--ink-dim);margin:0 0 12px}
+</style>
+</head>
+<body>
+
+<header></header>
+
+<main>
+
+<!-- ============ PREPARO ============ -->
+<section class="tela ativa" id="telaPreparo">
+  <div class="bloco">
+    <h2>Quantos jogam</h2>
+    <div class="escolhas" id="escQtd"></div>
+    <p class="legenda" style="margin:14px 0 0" id="legQtd">—</p>
+  </div>
+
+  <div class="bloco">
+    <h2>Os jogadores</h2>
+    <div id="listaJogadores"></div>
+  </div>
+
+  <div class="bloco">
+    <h2>A partida</h2>
+    <div class="escolhas" id="escRodadas"></div>
+  </div>
+
+  <button class="principal" id="btnComecar">Começar</button>
+</section>
+
+<!-- ============ JOGO ============ -->
+<section class="tela" id="telaJogo">
+  <div class="faixa" id="faixa">
+    <span class="bolinha" id="faixaBolinha"></span>
+    <span class="quem">
+      <span class="nome" id="faixaNome">—</span>
+      <span class="sub" id="faixaSub">—</span>
+    </span>
+    <span class="vidas" id="vidas">——————</span>
+  </div>
+
+  <div class="cena">
+    <svg id="forca" viewBox="0 0 170 220" aria-hidden="true">
+      <g id="estrutura">
+        <line class="viga" pathLength="1" x1="15"  y1="208" x2="105" y2="208"/>
+        <line class="viga" pathLength="1" x1="40"  y1="208" x2="40"  y2="18"/>
+        <line class="viga" pathLength="1" x1="40"  y1="18"  x2="118" y2="18"/>
+        <line class="viga" pathLength="1" x1="118" y1="18"  x2="118" y2="40"/>
+      </g>
+      <g id="boneco"></g>
+    </svg>
+
+    <div class="pista">
+      <span class="rotulo">A palavra é</span>
+      <p class="categoria" id="categoria">—</p>
+      <p class="revelada" id="revelada" style="display:none">—</p>
+    </div>
+  </div>
+
+  <div class="palavra" id="palavra"></div>
+
+  <div class="socorros">
+    <button class="socorro" id="btnLetra">Responder por uma letra<small>acertou, revela · errou, custa uma vida</small></button>
+    <button class="socorro" id="btnPista">Ver a pergunta<small>custa uma vida</small></button>
+  </div>
+
+  <div class="teclado" id="teclado"></div>
+
+  <p class="aviso" id="aviso"></p>
+  <div class="desfecho" id="desfecho"></div>
+  <button class="secundario" id="btnSair">Encerrar e voltar</button>
+</section>
+
+<!-- ============ FIM ============ -->
+<section class="tela" id="telaFim">
+  <div class="fim">
+    <h2 id="fimTitulo">—</h2>
+    <p class="legenda" id="fimSub">—</p>
+    <ol class="placar-lista" id="placarFinal"></ol>
+    <button class="principal" id="btnDeNovo">Jogar de novo</button>
+    <button class="secundario" id="btnVoltarPreparo">Mudar as opções</button>
+  </div>
+</section>
+
+</main>
+
+<script src="perguntas.js"></script>
+<script src="comum.js"></script>
+<script>
+"use strict";
+
+/* =========================================================
+   FORCA — Arena da Palavra
+   A palavra secreta é a resposta de uma pergunta do banco.
+   Você vê a categoria; a pergunta inteira só se pagar por ela.
+   v1.0.0
+   ========================================================= */
+
+const VERSAO = "1.0.1";
+const VIDAS = 6;
+
+const REGRAS = `
+  <h2>Como se joga</h2>
+
+  <h3>O objetivo</h3>
+  <p>Descobrir a palavra escondida antes que o boneco fique completo. São seis erros: cabeça, tronco, dois braços e duas pernas.</p>
+
+  <h3>De onde vem a palavra</h3>
+  <p>Toda palavra secreta é a resposta de uma pergunta bíblica do banco da Arena. No começo você só vê a categoria — um rei, uma cidade, um profeta.</p>
+
+  <h3>A jogada</h3>
+  <p>A primeira letra já vem revelada. Toque nas outras: se a letra existe na palavra, aparece nos espaços e você joga de novo. Se não existe, custa uma vida e a vez passa.</p>
+
+  <h3>Os dois socorros</h3>
+  <p><b>Responder por uma letra:</b> aparece uma pergunta bíblica qualquer. Acertando, uma letra é revelada de graça. Errando, custa uma vida.</p>
+  <p><b>Ver a pergunta:</b> mostra a pergunta que a palavra responde. Custa uma vida e só pode ser usada uma vez por palavra — mas quem conhece a Bíblia acerta na hora.</p>
+
+  <h3>Jogando acompanhado</h3>
+  <p>Todos disputam a mesma palavra e a mesma forca. Quem revelar a última letra ganha a rodada. Se o boneco completar, ninguém pontua.</p>
+`;
+
+/* --- as seis partes do boneco, na ordem em que aparecem --- */
+const PARTES = [
+  {t:"circle", a:{cx:118, cy:55, r:15}},
+  {t:"line",   a:{x1:118, y1:70,  x2:118, y2:130}},
+  {t:"line",   a:{x1:118, y1:84,  x2:94,  y2:110}},
+  {t:"line",   a:{x1:118, y1:84,  x2:142, y2:110}},
+  {t:"line",   a:{x1:118, y1:130, x2:97,  y2:168}},
+  {t:"line",   a:{x1:118, y1:130, x2:139, y2:168}}
+];
+
+const CORES_JOGADOR = ["#D4565F", "#C9A227", "#2A5B9C", "#2E6B4F"];
+const ALFABETO = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+
+const semAcento = s => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+
+/* --- de qual categoria é a palavra --- */
+function categoriaDe(pergunta){
+  const k = semAcento(pergunta).toLowerCase();
+  const casa = (re, rotulo) => new RegExp(re).test(k) ? rotulo : null;
+  return casa("qual igreja|igreja do apocalipse", "Uma das sete igrejas do Apocalipse")
+      || casa("\\btribo\\b", "Uma tribo de Israel")
+      || casa("(qual|que) profeta", "Um profeta")
+      || casa("(qual|que) rei|qual governador", "Um rei ou governante")
+      || casa("(qual|que) juiz", "Um juiz de Israel")
+      || casa("(qual|que) (livro|carta|epistola)|em qual (livro|carta)", "Um livro da Bíblia")
+      || casa("\\bilha\\b", "Uma ilha")
+      || casa("\\bmonte\\b", "Um monte")
+      || casa("\\brio\\b", "Um rio")
+      || casa("(cidade|local|lugar|terra|regiao)", "Uma cidade ou lugar")
+      || casa("qual animal|qual ave|quais aves|quais animais", "Um animal")
+      || casa("ocupacao|profissao|oficio", "Uma ocupação")
+      || casa("qual mulher|quem foi a mulher|qual (irma|esposa|mae|profetisa|nora)|quem foi a (mae|avo|bisavo)", "Uma mulher da Bíblia")
+      || casa("qual (discipulo|apostolo)", "Um discípulo de Jesus")
+      || casa("^o que|^com que|^de que (madeira|material)", "Um objeto")
+      || "Um personagem da Bíblia";
+}
+
+/* --- palavras aproveitáveis do banco --- */
+const PALAVRAS = PERGUNTAS
+  .map(q => ({q, r: q.o[q.c].trim()}))
+  .filter(x => !/[0-9()]/.test(x.r)
+            && x.r.split(/\s+/).length === 1
+            && /^[A-ZÀ-Ý]{4,13}$/.test(semAcento(x.r)))
+  .map(x => ({n:x.q.n, palavra:x.r, pergunta:x.q.p, ref:x.q.r, categoria:categoriaDe(x.q.p)}));
+
+let cfg = { qtd:1, alvo:3, jogadores:[] };
+let jogo = null;
+let usadas = [];
+
+/* ---------------------------------------------------------
+   PREPARO
+   --------------------------------------------------------- */
+
+function montarPreparo(){
+  UI.escolhas($("#escQtd"), [1,2,3,4], cfg.qtd, v => { cfg.qtd = v; montarPreparo(); });
+  $("#legQtd").textContent = cfg.qtd === 1
+    ? "Você contra a forca."
+    : "Todos disputam a mesma palavra, revezando as letras.";
+
+  UI.escolhas($("#escRodadas"),
+    [{valor:1,rotulo:"1"},{valor:3,rotulo:"3"},{valor:5,rotulo:"5"}],
+    cfg.alvo, v => { cfg.alvo = v; montarPreparo(); });
+
+  const anteriores = cfg.jogadores;
+  const lista = $("#listaJogadores");
+  lista.innerHTML = "";
+  cfg.jogadores = [];
+
+  for(let i = 0; i < cfg.qtd; i++){
+    const velho = anteriores[i] || {};
+    const j = {
+      nome: velho.nome || ("Jogador " + (i+1)),
+      nivel: velho.nivel || 2,
+      cor: CORES_JOGADOR[i],
+      pontos: 0
+    };
+    const linha = document.createElement("div");
+    linha.className = "jogador-linha";
+
+    const bola = document.createElement("span");
+    bola.className = "bolinha"; bola.style.background = j.cor;
+
+    const nome = document.createElement("input");
+    nome.type = "text"; nome.value = j.nome; nome.maxLength = 16;
+    nome.setAttribute("aria-label", "Nome do jogador " + (i+1));
+    nome.addEventListener("input", () => { j.nome = nome.value.trim() || ("Jogador " + (i+1)); });
+
+    const nivel = document.createElement("select");
+    nivel.setAttribute("aria-label", "Nível das palavras e perguntas");
+    [[1,"Fácil"],[2,"Médio"],[3,"Difícil"]].forEach(([v,t]) => {
+      const o = document.createElement("option"); o.value = v; o.textContent = t;
+      if(v === j.nivel) o.selected = true; nivel.appendChild(o);
+    });
+    nivel.addEventListener("change", () => { j.nivel = Number(nivel.value); });
+
+    linha.append(bola, nome, nivel);
+    lista.appendChild(linha);
+    cfg.jogadores.push(j);
+  }
+}
+
+/* ---------------------------------------------------------
+   PARTIDA
+   --------------------------------------------------------- */
+
+function comecar(){
+  Banco.zerar();
+  usadas = [];
+  cfg.jogadores.forEach(j => j.pontos = 0);
+  jogo = { rodada:1, vez:0, comeca:0 };
+  UI.trocarTela("telaJogo");
+  montarTeclado();
+  novaPalavra();
+}
+
+function atual(){ return cfg.jogadores[jogo.vez]; }
+
+function sortearPalavra(nivel){
+  let pool = PALAVRAS.filter(p => p.n === nivel && !usadas.includes(p.palavra));
+  if(pool.length === 0){
+    usadas = usadas.filter(u => !PALAVRAS.some(p => p.n === nivel && p.palavra === u));
+    pool = PALAVRAS.filter(p => p.n === nivel);
+  }
+  const escolhida = pool[Math.floor(Math.random() * pool.length)];
+  usadas.push(escolhida.palavra);
+  return escolhida;
+}
+
+function novaPalavra(){
+  const nivel = atual().nivel;
+  const item = sortearPalavra(nivel);
+
+  jogo.item = item;
+  jogo.letras = item.palavra.split("");
+  jogo.chave = semAcento(item.palavra).split("");
+  jogo.achadas = new Set();
+  jogo.tentadas = new Set();
+  jogo.achadas.add(jogo.chave[0]);      // a primeira letra vem de graça
+  jogo.tentadas.add(jogo.chave[0]);
+  jogo.erros = 0;
+  jogo.pistaUsada = false;
+  jogo.fim = false;
+  jogo.vez = jogo.comeca;
+
+  $("#boneco").innerHTML = "";
+  $("#desfecho").innerHTML = "";
+  $("#revelada").style.display = "none";
+  $("#categoria").textContent = item.categoria;
+  $("#btnPista").disabled = false;
+  $("#btnLetra").disabled = false;
+  const g = $("#estrutura"); g.innerHTML = g.innerHTML;   // redesenha a forca
+
+  desenharPalavra();
+  montarTeclado();
+  atualizarFaixa();
+  avisar(cfg.qtd === 1 ? "Escolha uma letra." : atual().nome + ", escolha uma letra.");
+}
+
+function atualizarFaixa(){
+  const j = atual();
+  $("#faixa").style.setProperty("--vez-cor", j.cor);
+  $("#faixaBolinha").style.background = j.cor;
+  $("#faixaNome").textContent = j.nome;
+  $("#faixaSub").textContent = cfg.alvo === 1
+    ? "rodada única"
+    : "rodada " + jogo.rodada + " · " + j.pontos + " de " + cfg.alvo;
+  const vidas = VIDAS - jogo.erros;
+  $("#vidas").textContent = "♥".repeat(vidas) + "·".repeat(jogo.erros);
+  $("#vidas").style.color = vidas <= 2 ? "var(--carmim-claro)" : "var(--gold)";
+  $("#vidas").setAttribute("aria-label", vidas + " vidas restantes");
+}
+
+function desenharPalavra(entregue){
+  const cx = $("#palavra");
+  cx.innerHTML = "";
+  jogo.letras.forEach((ch, i) => {
+    const d = document.createElement("span");
+    d.className = "letra";
+    const visivel = jogo.achadas.has(jogo.chave[i]) || entregue;
+    if(visivel){
+      d.textContent = ch;
+      d.classList.add("cheia");
+      if(entregue && !jogo.achadas.has(jogo.chave[i])) d.classList.add("entregue");
+    }
+    cx.appendChild(d);
+  });
+}
+
+function montarTeclado(){
+  const cx = $("#teclado");
+  cx.innerHTML = "";
+  ALFABETO.forEach(L => {
+    const b = document.createElement("button");
+    b.className = "tecla";
+    b.textContent = L;
+    if(jogo && jogo.tentadas.has(L)){
+      b.disabled = true;
+      b.classList.add(jogo.chave.includes(L) ? "certa" : "errada");
+    }
+    if(jogo && jogo.fim) b.disabled = true;
+    b.addEventListener("click", () => tentarLetra(L));
+    cx.appendChild(b);
+  });
+}
+
+function avisar(t){ $("#aviso").textContent = t || ""; }
+
+/* ---------- as jogadas ---------- */
+
+function tentarLetra(L){
+  if(!jogo || jogo.fim || jogo.tentadas.has(L)) return;
+  jogo.tentadas.add(L);
+
+  if(jogo.chave.includes(L)){
+    jogo.achadas.add(L);
+    Som.marcar();
+    desenharPalavra();
+    montarTeclado();
+    if(completou()) return venceu();
+    avisar("Boa. " + atual().nome + " continua.");
+    atualizarFaixa();
+  } else {
+    errar(atual().nome + " errou a letra " + L + ".");
+  }
+}
+
+function completou(){
+  return jogo.chave.every(c => jogo.achadas.has(c));
+}
+
+function revelarUma(){
+  const faltam = [...new Set(jogo.chave)].filter(c => !jogo.achadas.has(c));
+  if(faltam.length === 0) return;
+  const L = faltam[Math.floor(Math.random() * faltam.length)];
+  jogo.achadas.add(L);
+  jogo.tentadas.add(L);
+  Som.chegou();
+  desenharPalavra();
+  montarTeclado();
+}
+
+function errar(mensagem){
+  jogo.erros++;
+  const p = PARTES[jogo.erros - 1];
+  if(p){
+    const e = document.createElementNS("http://www.w3.org/2000/svg", p.t);
+    for(const k in p.a) e.setAttribute(k, p.a[k]);
+    e.setAttribute("class", "corpo");
+    e.setAttribute("pathLength", "1");
+    $("#boneco").appendChild(e);
+  }
+  Som.erro();
+  atualizarFaixa();
+  montarTeclado();
+
+  if(jogo.erros >= VIDAS) return perdeu();
+
+  if(cfg.qtd > 1){
+    jogo.vez = (jogo.vez + 1) % cfg.qtd;
+    atualizarFaixa();
+    avisar(mensagem + " Agora é a vez de " + atual().nome + ".");
+  } else {
+    avisar(mensagem);
+  }
+}
+
+function pedirLetra(){
+  if(!jogo || jogo.fim) return;
+  $("#btnLetra").disabled = true;
+  Pergunta.abrir({
+    para: atual().nome,
+    nivel: atual().nivel,
+    texto: a => a ? "Certa. Uma letra é revelada." : "Errada. Custa uma vida.",
+    aoResponder: (acertou) => {
+      $("#btnLetra").disabled = false;
+      if(acertou){
+        revelarUma();
+        if(completou()) return venceu();
+        avisar("Uma letra veio de graça.");
+      } else {
+        errar("A pergunta foi por água abaixo.");
+      }
+    }
+  });
+}
+
+function verPergunta(){
+  if(!jogo || jogo.fim || jogo.pistaUsada) return;
+  jogo.pistaUsada = true;
+  $("#btnPista").disabled = true;
+  $("#revelada").textContent = jogo.item.pergunta;
+  $("#revelada").style.display = "block";
+  Som.toque();
+  errar("A pergunta foi revelada.");
+}
+
+/* ---------- desfecho ---------- */
+
+function venceu(){
+  jogo.fim = true;
+  const j = atual();
+  j.pontos++;
+  Som.vitoria();
+  desenharPalavra();
+  montarTeclado();
+  atualizarFaixa();
+  fecharRodada(j.nome + " descobriu a palavra", true);
+}
+
+function perdeu(){
+  jogo.fim = true;
+  Som.pausa();
+  desenharPalavra(true);
+  montarTeclado();
+  fecharRodada("O boneco completou", false);
+}
+
+function fecharRodada(frase, ganhou){
+  avisar("");
+  $("#btnLetra").disabled = true;
+  $("#btnPista").disabled = true;
+
+  const cx = $("#desfecho");
+  cx.innerHTML = "";
+  const p = document.createElement("p");
+  p.className = "frase" + (ganhou ? " ganhou" : "");
+  p.textContent = frase;
+  const era = document.createElement("p");
+  era.className = "era";
+  era.textContent = "Era " + jogo.item.palavra + " — " + jogo.item.pergunta + " (" + jogo.item.ref + ")";
+  cx.append(p, era);
+
+  const campeao = cfg.jogadores.find(x => x.pontos >= cfg.alvo);
+  if(campeao) return setTimeout(fimDaPartida, 1600);
+
+  const b = document.createElement("button");
+  b.className = "principal";
+  b.textContent = "Próxima palavra";
+  b.addEventListener("click", () => {
+    jogo.rodada++;
+    jogo.comeca = (jogo.comeca + 1) % cfg.qtd;
+    novaPalavra();
+  });
+  cx.appendChild(b);
+  b.focus();
+}
+
+function fimDaPartida(){
+  const ordem = cfg.jogadores.slice().sort((a,b) => b.pontos - a.pontos);
+  Som.vitoria();
+  $("#fimTitulo").textContent = cfg.qtd === 1
+    ? "Você venceu a forca"
+    : ordem[0].nome + " venceu";
+  $("#fimSub").textContent = "em " + jogo.rodada + (jogo.rodada === 1 ? " rodada" : " rodadas");
+
+  const ol = $("#placarFinal");
+  ol.innerHTML = "";
+  ordem.forEach(j => {
+    const li = document.createElement("li");
+    const bola = document.createElement("span");
+    bola.className = "bolinha"; bola.style.background = j.cor;
+    const nome = document.createElement("span"); nome.textContent = j.nome;
+    const pts = document.createElement("span");
+    pts.style.flex = "0"; pts.style.color = "var(--ink-dim)";
+    pts.textContent = j.pontos;
+    li.append(bola, nome, pts);
+    ol.appendChild(li);
+  });
+  UI.trocarTela("telaFim");
+}
+
+/* ---------------------------------------------------------
+   LIGAÇÕES
+   --------------------------------------------------------- */
+
+UI.iniciar({ titulo:"Forca", versao:VERSAO, regras:REGRAS, voltar:"index.html" });
+
+$("#btnComecar").addEventListener("click", comecar);
+$("#btnLetra").addEventListener("click", pedirLetra);
+$("#btnPista").addEventListener("click", verPergunta);
+$("#btnSair").addEventListener("click", () => UI.trocarTela("telaPreparo"));
+$("#btnDeNovo").addEventListener("click", comecar);
+$("#btnVoltarPreparo").addEventListener("click", () => UI.trocarTela("telaPreparo"));
+
+document.addEventListener("keydown", e => {
+  if(!jogo || jogo.fim) return;
+  if($("#cortinaPergunta").classList.contains("ativa")) return;
+  const L = semAcento(e.key);
+  if(L.length === 1 && ALFABETO.includes(L)) tentarLetra(L);
+});
+
+montarPreparo();
+</script>
+</body>
+</html>
