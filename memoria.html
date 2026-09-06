@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0F1B33">
+<title>Memória — Arena da Palavra</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="32x32" href="icone-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icone-192.png">
+<link rel="apple-touch-icon" href="icone-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Arena da Palavra">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="comum.css">
+<style>
+/* Espaçamentos em pixels: porcentagem no sentido vertical se calcula
+   sobre a altura do container, que aqui só existe depois das cartas. */
+
+.faixa{
+  display:flex;align-items:stretch;gap:8px;margin-bottom:12px;flex-wrap:wrap;
+}
+.faixa .lado{
+  flex:1;min-width:74px;text-align:center;padding:9px 6px;border-radius:9px;
+  background:var(--surface);border:1px solid var(--linha);
+  transition:border-color .2s, background .2s;
+}
+.faixa .lado.vez{border-color:var(--cor-lado);background:color-mix(in srgb, var(--cor-lado) 15%, var(--surface))}
+.faixa .lado .quem{
+  display:block;font-family:'Cinzel',serif;font-size:12px;color:var(--ink-dim);
+  margin-bottom:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.faixa .lado.vez .quem{color:var(--cor-lado)}
+.faixa .lado .pontos{font-size:23px;line-height:1;font-family:'Cinzel',serif;color:var(--cor-lado);font-variant-numeric:tabular-nums}
+
+.mesa{display:grid;gap:7px;max-width:430px;margin:0 auto}
+.mesa.c2{grid-template-columns:repeat(2,1fr)}
+.mesa.c3{grid-template-columns:repeat(3,1fr)}
+.mesa.c4{grid-template-columns:repeat(4,1fr)}
+@media (max-width:360px){ .mesa{gap:5px} }
+
+.carta{
+  aspect-ratio:3/4;background:none;border:none;padding:0;
+  perspective:700px;-webkit-tap-highlight-color:transparent;
+}
+.carta:disabled{cursor:default}
+.folha{
+  position:relative;width:100%;height:100%;
+  transform-style:preserve-3d;transition:transform .38s ease;
+}
+.carta.aberta .folha{transform:rotateY(180deg)}
+.face{
+  position:absolute;inset:0;border-radius:9px;
+  -webkit-backface-visibility:hidden;backface-visibility:hidden;
+  display:grid;place-items:center;padding:6px;overflow:hidden;
+}
+.verso{
+  background:var(--surface);border:1px solid var(--gold);
+  color:var(--gold);font-size:19px;opacity:.9;
+}
+.carta:not(:disabled):hover .verso{background:var(--surface-2)}
+.frente{
+  background:var(--surface-2);border:1px solid var(--linha);
+  transform:rotateY(180deg);
+  text-align:center;line-height:1.18;hyphens:auto;overflow-wrap:anywhere;
+}
+.frente.pergunta{color:var(--ink)}
+.frente.resposta{color:var(--gold-soft);font-family:'Cinzel',serif}
+.t1{font-size:14px}
+.t2{font-size:12px}
+.t3{font-size:10.5px}
+.t4{font-size:9px}
+@media (max-width:360px){ .t1{font-size:12.5px} .t2{font-size:11px} .t3{font-size:9.5px} .t4{font-size:8.5px} }
+
+.carta.achada .frente{
+  border-color:var(--esmeralda);
+  background:color-mix(in srgb, var(--esmeralda) 26%, var(--surface-2));
+}
+.carta.errou .frente{border-color:var(--carmim-claro)}
+@media (prefers-reduced-motion:reduce){ .folha{transition:none} }
+
+.ultimo{
+  margin:14px auto 0;max-width:430px;min-height:44px;
+  padding:10px 12px;border-radius:9px;
+  background:var(--surface);border:1px solid var(--linha);
+  border-left:4px solid var(--esmeralda);
+  font-size:16px;line-height:1.35;display:none;
+}
+.ultimo.aparece{display:block}
+.ultimo b{color:var(--gold-soft)}
+.ultimo small{display:block;color:var(--ink-dim);font-size:14px;margin-top:3px}
+
+.desfecho{text-align:center;margin-top:14px}
+.desfecho .frase{font-family:'Cinzel',serif;font-size:19px;margin:0 0 10px}
+</style>
+</head>
+<body>
+
+<header></header>
+
+<main>
+
+<!-- ============ PREPARO ============ -->
+<section class="tela ativa" id="telaPreparo">
+  <div class="bloco">
+    <h2>Quem joga</h2>
+    <div class="escolhas" id="escModo"></div>
+  </div>
+
+  <div class="bloco">
+    <h2>Tamanho da mesa</h2>
+    <div class="escolhas" id="escTamanho"></div>
+    <p class="legenda" style="margin:14px 0 0" id="legTamanho">—</p>
+  </div>
+
+  <div class="bloco">
+    <h2>Os jogadores</h2>
+    <div id="listaJogadores"></div>
+  </div>
+
+  <button class="principal" id="btnComecar">Começar</button>
+</section>
+
+<!-- ============ JOGO ============ -->
+<section class="tela" id="telaJogo">
+  <div class="faixa" id="faixa"></div>
+  <div class="mesa" id="mesa"></div>
+  <div class="ultimo" id="ultimo"></div>
+  <p class="aviso" id="aviso">—</p>
+  <button class="secundario" id="btnSair">Encerrar e voltar</button>
+</section>
+
+<!-- ============ FIM ============ -->
+<section class="tela" id="telaFim">
+  <div class="fim">
+    <h2 id="fimTitulo">—</h2>
+    <p class="legenda" id="fimSub">—</p>
+    <ol class="placar-lista" id="placarFinal"></ol>
+    <button class="principal" id="btnDeNovo">Jogar de novo</button>
+    <button class="secundario" id="btnVoltarPreparo">Mudar as opções</button>
+  </div>
+</section>
+
+</main>
+
+<script src="perguntas.js"></script>
+<script src="comum.js"></script>
+<script>
+"use strict";
+
+/* =========================================================
+   MEMÓRIA DE PARES — Arena da Palavra
+   Cada par é uma pergunta e a sua resposta. Aqui a pergunta
+   não interrompe o jogo: ela é o próprio tabuleiro.
+   v1.0.0
+   ========================================================= */
+
+const VERSAO = "1.0.0";
+
+/* Mesa maior exige pergunta mais curta, senão o texto não cabe na carta. */
+const MESAS = {
+  pequena: {pares:4,  colunas:2, limite:70, rotulo:"8 cartas"},
+  media:   {pares:6,  colunas:3, limite:55, rotulo:"12 cartas"},
+  grande:  {pares:8,  colunas:4, limite:45, rotulo:"16 cartas"}
+};
+
+/* o quanto a máquina se lembra das cartas que já viu */
+const MEMORIA_MAQUINA = {1:0.35, 2:0.65, 3:0.92};
+
+const CORES_JOGADOR = ["#D4565F", "#C9A227", "#2A5B9C", "#2E6B4F"];
+
+const REGRAS = `
+  <h2>Como se joga</h2>
+
+  <h3>O objetivo</h3>
+  <p>Achar os pares. Só que aqui um par não são duas figuras iguais: é uma pergunta bíblica e a sua resposta.</p>
+
+  <h3>A jogada</h3>
+  <p>Vire duas cartas. Se uma for a pergunta e a outra a resposta certa, o par fica aberto e você joga de novo. Se não combinarem, as duas voltam a virar e a vez passa.</p>
+
+  <h3>Por que este é diferente dos outros</h3>
+  <p>Nos outros jogos da Arena a pergunta interrompe a jogada. Aqui ela é o tabuleiro inteiro — você aprende olhando, sem parar para responder nada.</p>
+
+  <h3>O tamanho da mesa</h3>
+  <p>Mesa pequena tem 8 cartas e cabe pergunta comprida. Mesa grande tem 16 e só entram perguntas curtas, senão o texto não cabe na carta.</p>
+
+  <h3>A máquina</h3>
+  <p>Ela esquece de propósito. No fácil guarda pouco mais de um terço das cartas que vê; no difícil, quase todas. Uma máquina com memória perfeita ganharia sempre, e não teria graça.</p>
+`;
+
+let cfg = { modo:"solo", tamanho:"media", jogadores:[] };
+let jogo = null;
+
+/* ---------------------------------------------------------
+   PREPARO
+   --------------------------------------------------------- */
+
+function qtdJogadores(){
+  if(cfg.modo === "solo") return 1;
+  if(cfg.modo === "maquina") return 2;
+  return Number(cfg.modo);
+}
+
+function montarPreparo(){
+  UI.escolhas($("#escModo"),
+    [{valor:"solo", rotulo:"Sozinho"}, {valor:"maquina", rotulo:"Máquina"},
+     {valor:"2", rotulo:"2"}, {valor:"3", rotulo:"3"}, {valor:"4", rotulo:"4"}],
+    cfg.modo, v => { cfg.modo = v; montarPreparo(); });
+
+  UI.escolhas($("#escTamanho"),
+    Object.keys(MESAS).map(k => ({valor:k, rotulo:MESAS[k].rotulo})),
+    cfg.tamanho, v => { cfg.tamanho = v; montarPreparo(); });
+
+  const m = MESAS[cfg.tamanho];
+  $("#legTamanho").textContent = m.pares + " pares. " +
+    (cfg.tamanho === "grande"
+      ? "Só entram perguntas curtas, para o texto caber na carta."
+      : cfg.tamanho === "pequena"
+        ? "Cartas grandes, boas para criança pequena."
+        : "O tamanho que eu usaria por padrão.");
+
+  const anteriores = cfg.jogadores;
+  const lista = $("#listaJogadores");
+  lista.innerHTML = "";
+  cfg.jogadores = [];
+
+  for(let i = 0; i < qtdJogadores(); i++){
+    const ehMaquina = cfg.modo === "maquina" && i === 1;
+    const velho = anteriores[i] || {};
+    const j = {
+      nome: ehMaquina ? "Máquina" : (velho.nome && velho.nome !== "Máquina" ? velho.nome : (i === 0 ? "Você" : "Jogador " + (i+1))),
+      nivel: velho.nivel || 2,
+      tipo: ehMaquina ? "maquina" : "humano",
+      cor: CORES_JOGADOR[i],
+      pontos: 0
+    };
+
+    const linha = document.createElement("div");
+    linha.className = "jogador-linha";
+    const bola = document.createElement("span");
+    bola.className = "bolinha"; bola.style.background = j.cor;
+
+    const nome = document.createElement("input");
+    nome.type = "text"; nome.value = j.nome; nome.maxLength = 16;
+    nome.disabled = ehMaquina;
+    nome.setAttribute("aria-label", "Nome do jogador " + (i+1));
+    nome.addEventListener("input", () => { j.nome = nome.value.trim() || ("Jogador " + (i+1)); });
+
+    const nivel = document.createElement("select");
+    nivel.setAttribute("aria-label", ehMaquina ? "Memória da máquina" : "Nível das perguntas");
+    [[1,"Fácil"],[2,"Médio"],[3,"Difícil"]].forEach(([v,t]) => {
+      const o = document.createElement("option"); o.value = v; o.textContent = t;
+      if(v === j.nivel) o.selected = true; nivel.appendChild(o);
+    });
+    nivel.addEventListener("change", () => { j.nivel = Number(nivel.value); });
+
+    linha.append(bola, nome, nivel);
+    lista.appendChild(linha);
+    cfg.jogadores.push(j);
+  }
+}
+
+/* ---------------------------------------------------------
+   MONTAR A MESA
+   --------------------------------------------------------- */
+
+function embaralhar(a){
+  for(let i = a.length - 1; i > 0; i--){
+    const k = Math.floor(Math.random() * (i + 1));
+    [a[i], a[k]] = [a[k], a[i]];
+  }
+  return a;
+}
+
+function classeTexto(t){
+  if(t.length <= 16) return "t1";
+  if(t.length <= 32) return "t2";
+  if(t.length <= 50) return "t3";
+  return "t4";
+}
+
+function sortearPares(){
+  const m = MESAS[cfg.tamanho];
+  const nivel = cfg.jogadores[0].nivel;
+
+  const serve = q => q.p.length <= m.limite && q.o[q.c].length <= 22;
+  let pool = PERGUNTAS.filter(q => q.n === nivel && serve(q));
+  if(pool.length < m.pares) pool = PERGUNTAS.filter(serve);
+
+  return embaralhar(pool.slice())
+    .slice(0, m.pares)
+    .map((q, i) => ({par:i, pergunta:q.p, resposta:q.o[q.c], ref:q.r}));
+}
+
+function comecar(){
+  const m = MESAS[cfg.tamanho];
+  const pares = sortearPares();
+
+  const cartas = [];
+  pares.forEach(p => {
+    cartas.push({par:p.par, tipo:"p", texto:p.pergunta, ref:p.ref, resposta:p.resposta});
+    cartas.push({par:p.par, tipo:"r", texto:p.resposta, ref:p.ref, pergunta:p.pergunta});
+  });
+  embaralhar(cartas);
+
+  cfg.jogadores.forEach(j => j.pontos = 0);
+  jogo = {
+    cartas,
+    abertas: [],
+    achadas: new Set(),
+    vez: 0,
+    fase: "escolher",
+    tentativas: 0,
+    inicio: Date.now(),
+    memoria: new Map()      // o que a máquina guardou: índice -> par
+  };
+
+  UI.trocarTela("telaJogo");
+  $("#ultimo").classList.remove("aparece");
+  montarMesa(m.colunas);
+  montarFaixa();
+  seguirVez();
+}
+
+function montarMesa(colunas){
+  const mesa = $("#mesa");
+  mesa.className = "mesa c" + colunas;
+  mesa.innerHTML = "";
+
+  jogo.cartas.forEach((c, i) => {
+    const b = document.createElement("button");
+    b.className = "carta";
+    b.dataset.i = i;
+    b.setAttribute("aria-label", "Carta " + (i+1));
+
+    const folha = document.createElement("span");
+    folha.className = "folha";
+
+    const verso = document.createElement("span");
+    verso.className = "face verso";
+    verso.textContent = "✦";
+
+    const frente = document.createElement("span");
+    frente.className = "face frente " + (c.tipo === "p" ? "pergunta " : "resposta ") + classeTexto(c.texto);
+    frente.textContent = c.texto;
+
+    folha.append(verso, frente);
+    b.appendChild(folha);
+    b.addEventListener("click", () => virar(i));
+    mesa.appendChild(b);
+  });
+}
+
+function montarFaixa(){
+  const f = $("#faixa");
+  f.innerHTML = "";
+  cfg.jogadores.forEach((j, i) => {
+    const d = document.createElement("div");
+    d.className = "lado";
+    d.style.setProperty("--cor-lado", j.cor);
+    d.innerHTML = '<span class="quem"></span><span class="pontos">0</span>';
+    $(".quem", d).textContent = j.nome;
+    f.appendChild(d);
+  });
+  atualizarFaixa();
+}
+
+function atualizarFaixa(){
+  $$("#faixa .lado").forEach((d, i) => {
+    $(".pontos", d).textContent = cfg.jogadores[i].pontos;
+    d.classList.toggle("vez", i === jogo.vez && jogo.fase !== "fim");
+  });
+}
+
+function avisar(t){ $("#aviso").textContent = t || ""; }
+function atual(){ return cfg.jogadores[jogo.vez]; }
+
+/* ---------------------------------------------------------
+   AS JOGADAS
+   --------------------------------------------------------- */
+
+function seguirVez(){
+  jogo.fase = "escolher";
+  atualizarFaixa();
+  travar(false);
+  const j = atual();
+  if(j.tipo === "maquina"){
+    travar(true);
+    avisar(j.nome + " está lembrando…");
+    setTimeout(jogadaDaMaquina, 900);
+  } else {
+    avisar(cfg.jogadores.length === 1
+      ? "Vire duas cartas."
+      : j.nome + ", vire duas cartas.");
+  }
+}
+
+function travar(t){
+  $$("#mesa .carta").forEach((b, i) => {
+    b.disabled = t || jogo.achadas.has(i) || jogo.abertas.includes(i) || jogo.fase !== "escolher";
+  });
+}
+
+function virar(i){
+  if(jogo.fase !== "escolher") return;
+  if(jogo.achadas.has(i) || jogo.abertas.includes(i)) return;
+  if(atual().tipo === "maquina") return;
+  abrirCarta(i);
+}
+
+function abrirCarta(i){
+  jogo.abertas.push(i);
+  $$("#mesa .carta")[i].classList.add("aberta");
+  Som.toque();
+  lembrar(i);
+
+  if(jogo.abertas.length < 2){ travar(false); return; }
+
+  jogo.fase = "conferindo";
+  jogo.tentativas++;
+  travar(true);
+  setTimeout(conferir, 700);
+}
+
+/* a máquina guarda o que viu, com a falha de memória do seu nível */
+function lembrar(i){
+  const maq = cfg.jogadores.find(j => j.tipo === "maquina");
+  if(!maq) return;
+  if(Math.random() < MEMORIA_MAQUINA[maq.nivel]) jogo.memoria.set(i, jogo.cartas[i].par);
+}
+
+function conferir(){
+  const [a, b] = jogo.abertas;
+  const ca = jogo.cartas[a], cb = jogo.cartas[b];
+  const combina = ca.par === cb.par && ca.tipo !== cb.tipo;
+  const cartas = $$("#mesa .carta");
+
+  if(combina){
+    jogo.achadas.add(a); jogo.achadas.add(b);
+    cartas[a].classList.add("achada"); cartas[b].classList.add("achada");
+    atual().pontos++;
+    Som.chegou();
+    mostrarUltimo(ca.tipo === "p" ? ca : cb, ca.tipo === "p" ? cb : ca);
+    jogo.abertas = [];
+    atualizarFaixa();
+
+    if(jogo.achadas.size === jogo.cartas.length) return setTimeout(fimDaPartida, 1100);
+
+    avisar(atual().nome + " achou um par e joga de novo.");
+    jogo.fase = "escolher";
+    return setTimeout(seguirVez, 850);
+  }
+
+  cartas[a].classList.add("errou"); cartas[b].classList.add("errou");
+  Som.erro();
+  avisar("Não combinam.");
+  setTimeout(() => {
+    cartas[a].classList.remove("aberta","errou");
+    cartas[b].classList.remove("aberta","errou");
+    jogo.abertas = [];
+    if(cfg.jogadores.length > 1) jogo.vez = (jogo.vez + 1) % cfg.jogadores.length;
+    seguirVez();
+  }, 1400);
+}
+
+function mostrarUltimo(cartaP, cartaR){
+  const u = $("#ultimo");
+  u.innerHTML = "";
+  const linha = document.createElement("span");
+  linha.textContent = cartaP.texto + " ";
+  const resp = document.createElement("b");
+  resp.textContent = cartaR.texto;
+  const ref = document.createElement("small");
+  ref.textContent = cartaP.ref;
+  u.append(linha, resp, ref);
+  u.classList.add("aparece");
+}
+
+/* ---------------------------------------------------------
+   A MÁQUINA
+   --------------------------------------------------------- */
+
+function jogadaDaMaquina(){
+  const livres = [];
+  for(let i = 0; i < jogo.cartas.length; i++)
+    if(!jogo.achadas.has(i)) livres.push(i);
+  if(livres.length < 2) return;
+
+  // já conhece um par inteiro?
+  let a = null, b = null;
+  for(const i of livres){
+    if(!jogo.memoria.has(i)) continue;
+    for(const k of livres){
+      if(k === i || !jogo.memoria.has(k)) continue;
+      if(jogo.memoria.get(i) === jogo.memoria.get(k)
+         && jogo.cartas[i].tipo !== jogo.cartas[k].tipo){ a = i; b = k; break; }
+    }
+    if(a !== null) break;
+  }
+
+  if(a === null){
+    const desconhecidas = livres.filter(i => !jogo.memoria.has(i));
+    const pool = desconhecidas.length ? desconhecidas : livres;
+    a = pool[Math.floor(Math.random() * pool.length)];
+  }
+
+  jogo.fase = "escolher";
+  abrirCarta(a);
+
+  if(b === null){
+    // depois de ver a primeira, procura a parceira na memória
+    const par = jogo.cartas[a].par;
+    const parceira = livres.find(i => i !== a && !jogo.abertas.includes(i)
+      && jogo.memoria.has(i) && jogo.memoria.get(i) === par
+      && jogo.cartas[i].tipo !== jogo.cartas[a].tipo);
+    const resto = livres.filter(i => i !== a);
+    b = parceira !== undefined ? parceira
+      : resto.filter(i => !jogo.memoria.has(i)).concat(resto)[0];
+  }
+
+  setTimeout(() => {
+    if(jogo.fase !== "escolher") return;
+    abrirCarta(b);
+  }, 800);
+}
+
+/* ---------------------------------------------------------
+   FIM
+   --------------------------------------------------------- */
+
+function fimDaPartida(){
+  jogo.fase = "fim";
+  atualizarFaixa();
+  Som.vitoria();
+
+  const segundos = Math.round((Date.now() - jogo.inicio) / 1000);
+  const tempo = segundos >= 60
+    ? Math.floor(segundos/60) + "min " + String(segundos%60).padStart(2,"0") + "s"
+    : segundos + "s";
+
+  if(cfg.jogadores.length === 1){
+    $("#fimTitulo").textContent = "Mesa limpa";
+    $("#fimSub").textContent = jogo.tentativas + " tentativas em " + tempo +
+      " · o mínimo possível seria " + (jogo.cartas.length / 2);
+    $("#placarFinal").innerHTML = "";
+  } else {
+    const ordem = cfg.jogadores.slice().sort((a,b) => b.pontos - a.pontos);
+    const empate = ordem.length > 1 && ordem[0].pontos === ordem[1].pontos;
+    $("#fimTitulo").textContent = empate ? "Empate" : ordem[0].nome + " venceu";
+    $("#fimSub").textContent = jogo.tentativas + " tentativas em " + tempo;
+
+    const ol = $("#placarFinal");
+    ol.innerHTML = "";
+    ordem.forEach(j => {
+      const li = document.createElement("li");
+      const bola = document.createElement("span");
+      bola.className = "bolinha"; bola.style.background = j.cor;
+      const nome = document.createElement("span"); nome.textContent = j.nome;
+      const pts = document.createElement("span");
+      pts.style.flex = "0"; pts.style.color = "var(--ink-dim)";
+      pts.textContent = j.pontos + (j.pontos === 1 ? " par" : " pares");
+      li.append(bola, nome, pts);
+      ol.appendChild(li);
+    });
+  }
+  UI.trocarTela("telaFim");
+}
+
+/* ---------------------------------------------------------
+   LIGAÇÕES
+   --------------------------------------------------------- */
+
+UI.iniciar({ titulo:"Memória", versao:VERSAO, regras:REGRAS, voltar:"index.html" });
+
+$("#btnComecar").addEventListener("click", comecar);
+$("#btnSair").addEventListener("click", () => UI.trocarTela("telaPreparo"));
+$("#btnDeNovo").addEventListener("click", comecar);
+$("#btnVoltarPreparo").addEventListener("click", () => UI.trocarTela("telaPreparo"));
+
+montarPreparo();
+</script>
+</body>
+</html>
