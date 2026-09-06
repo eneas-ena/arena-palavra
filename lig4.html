@@ -35,31 +35,24 @@
 
 /* ---------- tabuleiro ---------- */
 .arena{width:100%;max-width:400px;margin:0 auto}
-.setas{display:grid;grid-template-columns:repeat(7,1fr);gap:2%;margin-bottom:5px}
-.seta{
-  padding:4px 0;text-align:center;font-size:15px;color:var(--gold);
-  opacity:0;transition:opacity .15s;
-}
-.coluna.podendo:hover ~ .setas .seta{opacity:0}
 
+/* uma grade única de 42 furos: a altura sai do aspect-ratio de cada furo,
+   sem depender de porcentagens que o navegador não consegue resolver */
 .painel{
-  display:grid;grid-template-columns:repeat(7,1fr);gap:2%;
+  display:grid;grid-template-columns:repeat(7,1fr);gap:2.4%;
   background:var(--surface);border:1px solid var(--linha);
-  border-radius:12px;padding:2%;position:relative;
+  border-radius:12px;padding:2.4%;overflow:hidden;
 }
-.coluna{
-  display:grid;grid-template-rows:repeat(6,1fr);gap:6%;
-  background:none;border:none;padding:0;border-radius:8px;
-  -webkit-tap-highlight-color:transparent;
-}
-.coluna.livre:hover,.coluna.livre:focus-visible{background:rgba(201,162,39,.10)}
-.coluna:disabled{cursor:default}
 .furo{
-  width:100%;aspect-ratio:1;border-radius:50%;
+  width:100%;aspect-ratio:1;border-radius:50%;padding:0;border:none;
   background:var(--bg);box-shadow:inset 0 2px 5px rgba(0,0,0,.5);
-  display:grid;place-items:center;
+  display:grid;place-items:center;overflow:visible;
+  -webkit-tap-highlight-color:transparent;transition:box-shadow .15s;
 }
 [data-tema="claro"] .furo{background:#DCD4C2;box-shadow:inset 0 2px 4px rgba(0,0,0,.18)}
+.furo:disabled{cursor:default}
+.furo.realce{box-shadow:inset 0 2px 5px rgba(0,0,0,.5), 0 0 0 2px var(--gold)}
+.furo.alvo{box-shadow:inset 0 2px 5px rgba(0,0,0,.5), 0 0 0 3px var(--gold)}
 
 .disco{
   width:88%;height:88%;border-radius:50%;
@@ -75,8 +68,6 @@
 .disco.x{background:var(--carmim-claro)}
 .disco.o{background:var(--gold-soft)}
 @media (prefers-reduced-motion:reduce){.disco,.disco.venceu{animation:none}}
-
-.coluna.alvo{background:rgba(201,162,39,.20)}
 
 .resultado-rodada{text-align:center;margin-top:16px;min-height:52px}
 .resultado-rodada .frase{font-family:'Cinzel',serif;font-size:18px;margin:0 0 10px}
@@ -151,7 +142,7 @@
    v1.0.0
    ========================================================= */
 
-const VERSAO = "1.0.0";
+const VERSAO = "1.0.1";
 const COLS = 7, LINS = 6;
 
 const REGRAS = `
@@ -257,20 +248,26 @@ function jogadorDe(m){ return cfg.jogadores.find(j => j.marca === m); }
 function montarPainel(){
   const p = $("#painel");
   p.innerHTML = "";
-  for(let c = 0; c < COLS; c++){
-    const col = document.createElement("button");
-    col.className = "coluna";
-    col.dataset.c = c;
-    col.setAttribute("aria-label", "Coluna " + (c+1));
-    for(let l = 0; l < LINS; l++){
-      const f = document.createElement("span");
+  for(let l = 0; l < LINS; l++){
+    for(let c = 0; c < COLS; c++){
+      const f = document.createElement("button");
       f.className = "furo";
       f.dataset.l = l; f.dataset.c = c;
-      col.appendChild(f);
+      f.setAttribute("aria-label", "Soltar na coluna " + (c+1));
+      f.addEventListener("click", () => escolherColuna(c));
+      f.addEventListener("mouseenter", () => realcar(c, true));
+      f.addEventListener("mouseleave", () => realcar(c, false));
+      p.appendChild(f);
     }
-    col.addEventListener("click", () => escolherColuna(c));
-    p.appendChild(col);
   }
+}
+
+function furosDa(c){ return $$('#painel .furo[data-c="' + c + '"]'); }
+
+function realcar(c, ligar){
+  if(!jogo || jogo.fase !== "escolher") return;
+  if(alturaLivre(jogo.casas, c) < 0) return;
+  furosDa(c).forEach(f => f.classList.toggle("realce", ligar));
 }
 
 function novaRodada(){
@@ -278,7 +275,7 @@ function novaRodada(){
   jogo.vez = jogo.comeca;
   jogo.fase = "escolher";
   jogo.pendente = null;
-  $$("#painel .furo").forEach(f => f.innerHTML = "");
+  $$("#painel .furo").forEach(f => { f.innerHTML = ""; f.classList.remove("alvo","realce"); });
   $("#resultadoRodada").innerHTML = "";
   atualizarPlacar();
   seguirVez();
@@ -313,11 +310,10 @@ function seguirVez(){
 }
 
 function travar(t){
-  $$("#painel .coluna").forEach((col, c) => {
-    const livre = alturaLivre(jogo.casas, c) >= 0;
-    col.disabled = t || !livre;
-    col.classList.toggle("livre", !t && livre);
-    col.classList.remove("alvo");
+  $$("#painel .furo").forEach(f => {
+    const livre = alturaLivre(jogo.casas, Number(f.dataset.c)) >= 0;
+    f.disabled = t || !livre;
+    f.classList.remove("alvo", "realce");
   });
 }
 
@@ -338,8 +334,8 @@ function escolherColuna(c){
   jogo.fase = "respondendo";
   jogo.pendente = c;
   Som.toque();
-  $$("#painel .coluna")[c].classList.add("alvo");
   travar(true);
+  furosDa(c).forEach(f => f.classList.add("alvo"));
 
   const j = jogadorDe(jogo.vez);
   Pergunta.abrir({
@@ -354,7 +350,7 @@ function jogadaDaMaquina(){
   const j = jogadorDe(jogo.vez);
   const c = escolhaDaMaquina(j);
   jogo.pendente = c;
-  $$("#painel .coluna")[c].classList.add("alvo");
+  furosDa(c).forEach(f => f.classList.add("alvo"));
   Som.toque();
 
   const acertou = Math.random() < ACERTO_MAQUINA[j.nivel];
@@ -367,7 +363,7 @@ function jogadaDaMaquina(){
 
 function resolver(acertou){
   const c = jogo.pendente;
-  $$("#painel .coluna").forEach(col => col.classList.remove("alvo"));
+  $$("#painel .furo").forEach(f => f.classList.remove("alvo","realce"));
 
   if(acertou){
     const l = alturaLivre(jogo.casas, c);
