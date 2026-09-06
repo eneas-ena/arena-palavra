@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0F1B33">
+<title>Dominó — Arena da Palavra</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="32x32" href="icone-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icone-192.png">
+<link rel="apple-touch-icon" href="icone-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Arena da Palavra">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="comum.css">
+<style>
+.faixa{display:flex;align-items:stretch;gap:7px;margin-bottom:12px;flex-wrap:wrap}
+.faixa .lado{
+  flex:1;min-width:76px;text-align:center;padding:8px 5px;border-radius:9px;
+  background:var(--surface);border:1px solid var(--linha);
+  transition:border-color .2s, background .2s;
+}
+.faixa .lado.vez{border-color:var(--cor-lado);background:color-mix(in srgb, var(--cor-lado) 15%, var(--surface))}
+.faixa .lado .quem{
+  display:block;font-family:'Cinzel',serif;font-size:12px;color:var(--ink-dim);
+  margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.faixa .lado.vez .quem{color:var(--cor-lado)}
+.faixa .lado .pontos{font-size:20px;line-height:1.1;font-family:'Cinzel',serif;color:var(--cor-lado);font-variant-numeric:tabular-nums}
+.faixa .lado .mao{display:block;font-size:13px;color:var(--ink-dim)}
+
+/* ---------- peças ---------- */
+.peca{
+  display:grid;background:var(--casa);border:1px solid var(--casa-borda);
+  border-radius:5px;overflow:hidden;padding:0;flex-shrink:0;
+}
+.peca .meia{display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);padding:11%;gap:4%}
+.peca .meia i{border-radius:50%;background:#2B2417;width:100%;aspect-ratio:1;visibility:hidden;align-self:center;justify-self:center}
+.peca .meia i.on{visibility:visible}
+.peca .divisa{background:var(--casa-borda)}
+
+.peca.pe{grid-template-rows:1fr 2px 1fr;width:42px;height:86px}
+.peca.pe .divisa{height:2px}
+.peca.deitada{grid-template-columns:1fr 2px 1fr;width:56px;height:28px}
+.peca.deitada .divisa{width:2px}
+
+.mao{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin:14px 0 10px;min-height:88px}
+.peca.jogavel{cursor:pointer;box-shadow:0 0 0 2px var(--gold)}
+.peca.jogavel:hover{box-shadow:0 0 0 3px var(--gold), 0 0 10px var(--gold)}
+.peca.escolhida{box-shadow:0 0 0 3px var(--ink)}
+.peca.morta{opacity:.4}
+
+/* ---------- mesa ---------- */
+.pontas{
+  display:flex;align-items:center;justify-content:center;gap:14px;
+  margin-bottom:8px;font-family:'Cinzel',serif;
+}
+.ponta{
+  min-width:64px;padding:9px 12px;border-radius:9px;text-align:center;
+  background:var(--surface);border:1px solid var(--linha);
+}
+.ponta small{display:block;font-size:11px;color:var(--ink-dim);font-family:'Cormorant Garamond',serif}
+.ponta b{font-size:23px;color:var(--gold)}
+.ponta.alvo{border-color:var(--gold);background:rgba(201,162,39,.18);cursor:pointer}
+.ponta.alvo:hover{background:rgba(201,162,39,.34)}
+
+.mesa{
+  display:flex;gap:3px;align-items:center;overflow-x:auto;
+  background:var(--surface);border:1px solid var(--linha);
+  border-radius:10px;padding:9px;min-height:50px;
+  scrollbar-width:thin;
+}
+.mesa:empty::after{content:'a mesa está vazia';color:var(--ink-dim);font-size:15px;margin:auto}
+
+.botoes{display:flex;gap:8px;margin-bottom:10px}
+.botoes button{flex:1;padding:12px 8px;font-size:15px}
+
+/* ---------- passagem do aparelho ---------- */
+.passagem{
+  position:fixed;inset:0;background:var(--bg);z-index:50;
+  display:none;flex-direction:column;align-items:center;justify-content:center;
+  padding:24px;text-align:center;gap:14px;
+}
+.passagem.ativa{display:flex}
+.passagem h2{font-size:22px;margin:0;color:var(--gold)}
+.passagem p{color:var(--ink-dim);font-size:17px;margin:0;max-width:30ch}
+.passagem .principal{max-width:280px}
+
+.desfecho{text-align:center;margin-top:12px}
+.desfecho .frase{font-family:'Cinzel',serif;font-size:19px;margin:0 0 8px}
+.desfecho .frase.venceu{color:var(--gold)}
+.desfecho .conta{font-size:16px;color:var(--ink-dim);margin:0 0 12px}
+</style>
+</head>
+<body>
+
+<header></header>
+
+<main>
+
+<!-- ============ PREPARO ============ -->
+<section class="tela ativa" id="telaPreparo">
+  <div class="bloco">
+    <h2>Quantos jogam</h2>
+    <div class="escolhas" id="escQtd"></div>
+    <p class="legenda" style="margin:14px 0 0" id="legQtd">—</p>
+  </div>
+
+  <div class="bloco">
+    <h2>A partida vai até</h2>
+    <div class="escolhas" id="escAlvo"></div>
+  </div>
+
+  <div class="bloco">
+    <h2>Os jogadores</h2>
+    <div id="listaJogadores"></div>
+  </div>
+
+  <div class="bloco">
+    <h2>Regra da casa</h2>
+    <label class="opcao">
+      <input type="checkbox" id="optBatida" checked>
+      <span>Pergunta na batida
+        <small>Para jogar a última peça e bater, é preciso acertar uma pergunta bíblica. Errando, a peça não sai e a vez passa.</small>
+      </span>
+    </label>
+  </div>
+
+  <button class="principal" id="btnComecar">Começar</button>
+</section>
+
+<!-- ============ JOGO ============ -->
+<section class="tela" id="telaJogo">
+  <div class="faixa" id="faixa"></div>
+
+  <div class="pontas" id="pontas"></div>
+  <div class="mesa" id="mesa"></div>
+
+  <div class="mao" id="minhaMao"></div>
+
+  <div class="botoes" id="botoes">
+    <button class="secundario menor" id="btnComprar">Comprar do dorme</button>
+    <button class="secundario menor" id="btnPassar">Passar a vez</button>
+  </div>
+
+  <p class="aviso" id="aviso">—</p>
+  <div class="desfecho" id="desfecho"></div>
+  <button class="secundario" id="btnSair">Encerrar e voltar</button>
+</section>
+
+<!-- ============ FIM ============ -->
+<section class="tela" id="telaFim">
+  <div class="fim">
+    <h2 id="fimTitulo">—</h2>
+    <p class="legenda" id="fimSub">—</p>
+    <ol class="placar-lista" id="placarFinal"></ol>
+    <button class="principal" id="btnDeNovo">Jogar de novo</button>
+    <button class="secundario" id="btnVoltarPreparo">Mudar as opções</button>
+  </div>
+</section>
+
+</main>
+
+<div class="passagem" id="passagem">
+  <h2 id="passagemNome">—</h2>
+  <p id="passagemTexto">Passe o aparelho e toque quando estiver com ele na mão.</p>
+  <button class="principal" id="btnVerMao">Ver minhas peças</button>
+</div>
+
+<script src="perguntas.js"></script>
+<script src="comum.js"></script>
+<script>
+"use strict";
+
+/* =========================================================
+   DOMINÓ — Arena da Palavra
+   Dominó de seis, 28 peças. Para bater é preciso acertar
+   uma pergunta bíblica: a última peça é a mais cara da mão.
+   v1.0.0
+   ========================================================= */
+
+const VERSAO = "1.0.2";
+const CORES_JOGADOR = ["#D4565F", "#C9A227", "#2A5B9C", "#2E6B4F"];
+const PIPS = {0:[],1:[4],2:[0,8],3:[0,4,8],4:[0,2,6,8],5:[0,2,4,6,8],6:[0,2,3,5,6,8]};
+
+const REGRAS = `
+  <h2>Como se joga</h2>
+
+  <h3>As peças</h3>
+  <p>São 28 peças, de zero-zero até seis-seis. Cada jogador recebe sete. O que sobra fica no dorme, de onde se compra.</p>
+
+  <h3>Quem começa</h3>
+  <p>Começa quem tiver a carroça mais alta — o seis-seis, se alguém o tiver, senão o cinco-cinco, e assim por diante. Não havendo carroça, começa quem tem a peça mais pesada.</p>
+
+  <h3>A jogada</h3>
+  <p>Encaixe uma peça numa das duas pontas da mesa, casando os números. As peças que você pode jogar ficam contornadas de dourado. Se a peça servir nas duas pontas, o app pergunta em qual você quer.</p>
+  <p>Não tendo peça que sirva, compre do dorme. Com o dorme vazio, passe a vez.</p>
+
+  <h3>A batida e a pergunta</h3>
+  <p>Quem joga a última peça bate e ganha a mão. Mas, com a regra da casa ligada, essa última peça só sai se você acertar uma pergunta bíblica. Errando, ela fica na sua mão e a vez passa — e o adversário pode bater antes de você.</p>
+  <p>É a regra mais dura da Arena, e dá para desligá-la no preparo.</p>
+
+  <h3>Quando a mesa tranca</h3>
+  <p>Se ninguém puder jogar e o dorme estiver vazio, a mesa trancou. Ganha a mão quem tiver menos pontos na mão.</p>
+
+  <h3>A contagem</h3>
+  <p>Quem ganha a mão soma os pontos que sobraram nas mãos de todos os outros. Vence a partida quem chegar primeiro ao total combinado.</p>
+`;
+
+let cfg = { qtd:2, alvo:50, batida:true, jogadores:[] };
+let jogo = null;
+
+/* ---------------------------------------------------------
+   PREPARO
+   --------------------------------------------------------- */
+
+function montarPreparo(){
+  UI.escolhas($("#escQtd"), [2,3,4], cfg.qtd, v => { cfg.qtd = v; montarPreparo(); });
+  UI.escolhas($("#escAlvo"),
+    [{valor:30,rotulo:"30 pontos"},{valor:50,rotulo:"50"},{valor:100,rotulo:"100"}],
+    cfg.alvo, v => { cfg.alvo = v; montarPreparo(); });
+
+  $("#legQtd").textContent = cfg.qtd === 4
+    ? "Com quatro jogadores as 28 peças são todas distribuídas: não há dorme para comprar."
+    : "Cada um recebe 7 peças; as " + (28 - cfg.qtd*7) + " restantes ficam no dorme.";
+
+  const anteriores = cfg.jogadores;
+  const lista = $("#listaJogadores");
+  lista.innerHTML = "";
+  cfg.jogadores = [];
+
+  for(let i = 0; i < cfg.qtd; i++){
+    const velho = anteriores[i] || {};
+    const j = {
+      nome: velho.nome || (i === 0 ? "Você" : "Máquina " + i),
+      tipo: velho.tipo || (i === 0 ? "humano" : "maquina"),
+      nivel: velho.nivel || 2,
+      cor: CORES_JOGADOR[i],
+      pontos: 0,
+      mao: []
+    };
+    const linha = document.createElement("div");
+    linha.className = "jogador-linha";
+    const bola = document.createElement("span");
+    bola.className = "bolinha"; bola.style.background = j.cor;
+    const nome = document.createElement("input");
+    nome.type = "text"; nome.value = j.nome; nome.maxLength = 14;
+    nome.setAttribute("aria-label", "Nome do jogador " + (i+1));
+    nome.addEventListener("input", () => { j.nome = nome.value.trim() || ("Jogador " + (i+1)); });
+    const tipo = document.createElement("select");
+    tipo.setAttribute("aria-label", "Tipo de jogador");
+    [["humano","Pessoa"],["maquina","Máquina"]].forEach(([v,t]) => {
+      const o = document.createElement("option"); o.value = v; o.textContent = t;
+      if(v === j.tipo) o.selected = true; tipo.appendChild(o);
+    });
+    tipo.addEventListener("change", () => {
+      j.tipo = tipo.value;
+      if(j.tipo === "maquina" && !/Máquina/.test(j.nome)){ j.nome = "Máquina " + i; montarPreparo(); }
+    });
+    const nivel = document.createElement("select");
+    nivel.setAttribute("aria-label", "Nível");
+    [[1,"Fácil"],[2,"Médio"],[3,"Difícil"]].forEach(([v,t]) => {
+      const o = document.createElement("option"); o.value = v; o.textContent = t;
+      if(v === j.nivel) o.selected = true; nivel.appendChild(o);
+    });
+    nivel.addEventListener("change", () => { j.nivel = Number(nivel.value); });
+    linha.append(bola, nome, tipo, nivel);
+    lista.appendChild(linha);
+    cfg.jogadores.push(j);
+  }
+}
+
+/* ---------------------------------------------------------
+   PEÇAS
+   --------------------------------------------------------- */
+
+function baralho(){
+  const p = [];
+  for(let a = 0; a <= 6; a++) for(let b = a; b <= 6; b++) p.push([a,b]);
+  return p;
+}
+function embaralhar(a){
+  for(let i = a.length - 1; i > 0; i--){
+    const k = Math.floor(Math.random() * (i + 1));
+    [a[i], a[k]] = [a[k], a[i]];
+  }
+  return a;
+}
+const valor = pc => pc[0] + pc[1];
+const carroca = pc => pc[0] === pc[1];
+
+function desenharPeca(pc, deitada){
+  const d = document.createElement("div");
+  d.className = "peca " + (deitada ? "deitada" : "pe");
+  const meia = v => {
+    const m = document.createElement("span");
+    m.className = "meia";
+    for(let k = 0; k < 9; k++){
+      const i = document.createElement("i");
+      if(PIPS[v].includes(k)) i.className = "on";
+      m.appendChild(i);
+    }
+    return m;
+  };
+  const divisa = document.createElement("span");
+  divisa.className = "divisa";
+  d.append(meia(pc[0]), divisa, meia(pc[1]));
+  d.setAttribute("aria-label", pc[0] + " e " + pc[1]);
+  return d;
+}
+
+/* ---------------------------------------------------------
+   PARTIDA
+   --------------------------------------------------------- */
+
+function comecar(){
+  cfg.batida = $("#optBatida").checked;
+  Banco.zerar();
+  cfg.jogadores.forEach(j => j.pontos = 0);
+  jogo = { mao:1 };
+  UI.trocarTela("telaJogo");
+  novaMao();
+}
+
+function novaMao(){
+  const pecas = embaralhar(baralho());
+  cfg.jogadores.forEach((j, i) => { j.mao = pecas.slice(i*7, i*7 + 7); });
+  jogo.dorme = pecas.slice(cfg.qtd * 7);
+  jogo.mesa = [];              // peças na ordem em que estão na mesa
+  jogo.pontas = [null, null];
+  jogo.fase = "jogar";
+  jogo.escolhida = null;
+  jogo.passesSeguidos = 0;
+
+  // começa quem tem a carroça mais alta; sem carroça, a peça mais pesada
+  let melhor = -1, quem = 0;
+  cfg.jogadores.forEach((j, i) => {
+    j.mao.forEach(pc => {
+      const nota = (carroca(pc) ? 100 : 0) + valor(pc);
+      if(nota > melhor){ melhor = nota; quem = i; }
+    });
+  });
+  jogo.vez = quem;
+
+  $("#desfecho").innerHTML = "";
+  redesenhar();
+  avisar(cfg.jogadores[quem].nome + " começa, com a peça mais alta.");
+  setTimeout(seguirVez, 900);
+}
+
+function atual(){ return cfg.jogadores[jogo.vez]; }
+
+function encaixa(pc, ponta){ return pc[0] === ponta || pc[1] === ponta; }
+
+function jogaveis(mao){
+  if(jogo.mesa.length === 0) return mao.map((pc, i) => ({i, pontas:["l","r"]}));
+  const fora = [];
+  mao.forEach((pc, i) => {
+    const pontas = [];
+    if(encaixa(pc, jogo.pontas[0])) pontas.push("l");
+    if(encaixa(pc, jogo.pontas[1])) pontas.push("r");
+    if(pontas.length) fora.push({i, pontas});
+  });
+  return fora;
+}
+
+function redesenhar(){
+  montarFaixa();
+  desenharMesa();
+  desenharMao();
+}
+
+function montarFaixa(){
+  const f = $("#faixa");
+  f.innerHTML = "";
+  cfg.jogadores.forEach((j, i) => {
+    const d = document.createElement("div");
+    d.className = "lado" + (i === jogo.vez && jogo.fase !== "fim" ? " vez" : "");
+    d.style.setProperty("--cor-lado", j.cor);
+    d.innerHTML = '<span class="quem"></span><span class="pontos"></span><span class="mao"></span>';
+    $(".quem", d).textContent = j.nome;
+    $(".pontos", d).textContent = j.pontos;
+    $(".mao", d).textContent = j.mao.length + (j.mao.length === 1 ? " peça" : " peças");
+    f.appendChild(d);
+  });
+}
+
+function desenharMesa(){
+  const m = $("#mesa");
+  m.innerHTML = "";
+  jogo.mesa.forEach(pc => m.appendChild(desenharPeca(pc, true)));
+  m.scrollLeft = m.scrollWidth;
+
+  const p = $("#pontas");
+  p.innerHTML = "";
+  if(jogo.mesa.length === 0){
+    p.innerHTML = '<span class="ponta"><small>mesa vazia</small><b>—</b></span>';
+    return;
+  }
+  const podeEscolher = jogo.escolhida !== null;
+  const dest = podeEscolher ? jogo.escolhida.pontas : [];
+  [["l", 0, "ponta esquerda"], ["r", 1, "ponta direita"]].forEach(([lado, idx, rotulo]) => {
+    const b = document.createElement("button");
+    b.className = "ponta" + (dest.includes(lado) ? " alvo" : "");
+    b.innerHTML = '<small>' + rotulo + '</small><b>' + jogo.pontas[idx] + '</b>';
+    b.disabled = !dest.includes(lado);
+    if(dest.includes(lado)) b.addEventListener("click", () => encaixar(jogo.escolhida.i, lado));
+    p.appendChild(b);
+  });
+}
+
+function desenharMao(){
+  const cx = $("#minhaMao");
+  cx.innerHTML = "";
+  const j = atual();
+  const humano = j.tipo === "humano" && jogo.fase === "jogar";
+  if(!humano){
+    const aviso = document.createElement("p");
+    aviso.className = "legenda";
+    aviso.style.margin = "auto";
+    aviso.textContent = j.tipo === "maquina" ? j.nome + " está jogando…" : "";
+    cx.appendChild(aviso);
+    $("#botoes").style.display = "none";
+    return;
+  }
+
+  const podem = jogaveis(j.mao);
+  j.mao.forEach((pc, i) => {
+    const d = desenharPeca(pc, false);
+    const jog = podem.find(x => x.i === i);
+    if(jog){
+      d.classList.add("jogavel");
+      if(jogo.escolhida && jogo.escolhida.i === i) d.classList.add("escolhida");
+      d.setAttribute("role", "button");
+      d.setAttribute("tabindex", "0");
+      const agir = () => escolherPeca(jog);
+      d.addEventListener("click", agir);
+      d.addEventListener("keydown", e => {
+        if(e.key === "Enter" || e.key === " "){ e.preventDefault(); agir(); }
+      });
+    } else d.classList.add("morta");
+    cx.appendChild(d);
+  });
+
+  $("#botoes").style.display = "flex";
+  $("#btnComprar").disabled = podem.length > 0 || jogo.dorme.length === 0;
+  $("#btnPassar").disabled = podem.length > 0 || jogo.dorme.length > 0;
+}
+
+function avisar(t){ $("#aviso").textContent = t || ""; }
+
+/* ---------- vez ---------- */
+
+function seguirVez(){
+  if(jogo.fase === "fim") return;
+  jogo.fase = "jogar";
+  jogo.escolhida = null;
+  const j = atual();
+
+  if(j.tipo === "maquina"){
+    redesenhar();
+    avisar(j.nome + " está jogando…");
+    return setTimeout(jogadaDaMaquina, 800);
+  }
+
+  // com mais de uma pessoa, esconde a mão até o aparelho trocar de mãos
+  const humanos = cfg.jogadores.filter(x => x.tipo === "humano").length;
+  if(humanos > 1){
+    /* Apaga a mão da tela ANTES de mostrar a cobertura. A cobertura é
+       opaca, mas num jogo de mão escondida não quero depender disso. */
+    jogo.fase = "passando";
+    redesenhar();
+    $("#minhaMao").innerHTML = "";
+    $("#passagemNome").textContent = j.nome;
+    $("#passagem").classList.add("ativa");
+    $("#btnVerMao").focus();
+    return;
+  }
+  mostrarVez();
+}
+
+function mostrarVez(){
+  jogo.fase = "jogar";
+  const j = atual();
+  redesenhar();
+  const podem = jogaveis(j.mao);
+  avisar(podem.length
+    ? j.nome + ", escolha uma peça."
+    : (jogo.dorme.length ? "Nenhuma peça serve. Compre do dorme." : "Nenhuma peça serve e o dorme acabou. Passe a vez."));
+}
+
+function escolherPeca(jog){
+  if(jogo.fase !== "jogar") return;
+  Som.toque();
+  if(jogo.mesa.length === 0) return encaixar(jog.i, "r");
+  if(jog.pontas.length === 1) return encaixar(jog.i, jog.pontas[0]);
+  jogo.escolhida = jog;
+  redesenhar();
+  avisar("Serve nas duas pontas. Toque na ponta onde quer encaixar.");
+}
+
+function encaixar(indice, lado){
+  /* Trava a mesa antes de qualquer coisa. Sem isso, os botões das pontas
+     continuam clicáveis enquanto a pergunta da batida está aberta, e a
+     mesma peça pode ser jogada duas vezes. */
+  if(jogo.fase !== "jogar") return;
+  const j = atual();
+  const pc = j.mao[indice];
+  if(!pc) return;
+  const ultima = j.mao.length === 1;
+
+  jogo.fase = "movendo";
+  jogo.escolhida = null;
+  redesenhar();
+
+  if(ultima && cfg.batida && j.tipo === "humano"){
+    jogo.fase = "respondendo";
+    return Pergunta.abrir({
+      para: j.nome,
+      nivel: j.nivel,
+      texto: a => a ? "Certa. A peça sai e você bate." : "Errada. A peça fica na sua mão e a vez passa.",
+      aoResponder: (acertou) => {
+        if(!acertou){
+          Som.erro();
+          avisar("A batida falhou. A peça continua com você.");
+          jogo.fase = "jogar";
+          return setTimeout(passarAdiante, 900);
+        }
+        assentar(indice, lado);
+      }
+    });
+  }
+
+  if(ultima && cfg.batida && j.tipo === "maquina"){
+    jogo.fase = "respondendo";
+    const acertou = Math.random() < ACERTO_MAQUINA[j.nivel];
+    return setTimeout(() => {
+      if(!acertou){
+        Som.erro();
+        avisar(j.nome + " ia bater mas errou a pergunta.");
+        jogo.fase = "jogar";
+        return setTimeout(passarAdiante, 1000);
+      }
+      Som.acerto();
+      assentar(indice, lado);
+    }, 800);
+  }
+
+  assentar(indice, lado);
+}
+
+function assentar(indice, lado){
+  const j = atual();
+  if(!j.mao[indice]) return;
+  const pc = j.mao.splice(indice, 1)[0];
+  jogo.escolhida = null;
+  jogo.passesSeguidos = 0;
+  Som.marcar();
+
+  if(jogo.mesa.length === 0){
+    jogo.mesa.push(pc.slice());
+    jogo.pontas = [pc[0], pc[1]];
+  } else if(lado === "l"){
+    const p = jogo.pontas[0];
+    const posta = pc[1] === p ? [pc[0], pc[1]] : [pc[1], pc[0]];
+    jogo.mesa.unshift(posta);
+    jogo.pontas[0] = posta[0];
+  } else {
+    const p = jogo.pontas[1];
+    const posta = pc[0] === p ? [pc[0], pc[1]] : [pc[1], pc[0]];
+    jogo.mesa.push(posta);
+    jogo.pontas[1] = posta[1];
+  }
+
+  jogo.fase = "jogar";
+  redesenhar();
+  avisar(j.nome + " jogou " + pc[0] + "-" + pc[1] + ".");
+
+  if(j.mao.length === 0) return setTimeout(() => fimDaMao(jogo.vez, "bateu"), 900);
+  setTimeout(passarAdiante, 750);
+}
+
+function comprar(){
+  if(jogo.fase !== "jogar" || jogo.dorme.length === 0) return;
+  const j = atual();
+  j.mao.push(jogo.dorme.pop());
+  Som.toque();
+  redesenhar();
+  avisar(j.nome + " comprou uma peça. Restam " + jogo.dorme.length + " no dorme.");
+}
+
+function passar(){
+  if(jogo.fase !== "jogar") return;
+  jogo.fase = "movendo";
+  jogo.passesSeguidos++;
+  Som.pausa();
+  avisar(atual().nome + " passou a vez.");
+  if(jogo.passesSeguidos >= cfg.qtd) return setTimeout(() => fimDaMao(null, "trancou"), 800);
+  setTimeout(passarAdiante, 700);
+}
+
+function passarAdiante(){
+  if(jogo.fase === "fim") return;
+  jogo.vez = (jogo.vez + 1) % cfg.qtd;
+  seguirVez();
+}
+
+/* ---------------------------------------------------------
+   A MÁQUINA
+   --------------------------------------------------------- */
+
+function jogadaDaMaquina(){
+  const j = atual();
+  let podem = jogaveis(j.mao);
+
+  while(podem.length === 0 && jogo.dorme.length > 0){
+    j.mao.push(jogo.dorme.pop());
+    podem = jogaveis(j.mao);
+  }
+  if(podem.length === 0){
+    redesenhar();
+    return passar();
+  }
+
+  let escolha;
+  if(j.nivel === 1){
+    escolha = podem[Math.floor(Math.random() * podem.length)];
+  } else {
+    // pesa: soltar peça pesada, guardar variedade de números, segurar carroça útil
+    const contaNumeros = {};
+    j.mao.forEach(pc => { contaNumeros[pc[0]] = (contaNumeros[pc[0]]||0)+1;
+                          contaNumeros[pc[1]] = (contaNumeros[pc[1]]||0)+1; });
+    let melhorNota = -Infinity;
+    podem.forEach(x => {
+      const pc = j.mao[x.i];
+      x.pontas.forEach(lado => {
+        let nota = valor(pc) * 1.2;
+        if(carroca(pc)) nota += 6;
+        // que número fica exposto depois desta jogada?
+        const exposto = jogo.mesa.length === 0 ? pc[0]
+          : (lado === "l" ? (pc[1] === jogo.pontas[0] ? pc[0] : pc[1])
+                          : (pc[0] === jogo.pontas[1] ? pc[1] : pc[0]));
+        nota += (contaNumeros[exposto] || 0) * 3;          // deixa aberto o que eu tenho
+        if(j.nivel === 3){
+          const outros = cfg.jogadores.filter(o => o !== j)
+                          .reduce((s,o) => s + o.mao.length, 0);
+          if(j.mao.length <= 3) nota += valor(pc) * 0.8;    // no fim, descarrega peso
+          if(outros <= 3) nota += (contaNumeros[exposto]||0) * 2;
+        }
+        if(nota > melhorNota){ melhorNota = nota; escolha = {i:x.i, lado}; }
+      });
+    });
+  }
+
+  const lado = escolha.lado || (escolha.pontas ? escolha.pontas[0] : "r");
+  redesenhar();
+  setTimeout(() => encaixar(escolha.i, lado), 400);
+}
+
+/* ---------------------------------------------------------
+   FIM DE MÃO E DE PARTIDA
+   --------------------------------------------------------- */
+
+function fimDaMao(vencedor, motivo){
+  jogo.fase = "fim-mao";
+
+  if(vencedor === null){
+    // trancou: ganha quem tem menos pontos na mão
+    let menor = Infinity;
+    cfg.jogadores.forEach((j, i) => {
+      const soma = j.mao.reduce((s, pc) => s + valor(pc), 0);
+      if(soma < menor){ menor = soma; vencedor = i; }
+    });
+  }
+
+  const ganhos = cfg.jogadores.reduce((s, j, i) =>
+    i === vencedor ? s : s + j.mao.reduce((t, pc) => t + valor(pc), 0), 0);
+  cfg.jogadores[vencedor].pontos += ganhos;
+
+  Som.chegou();
+  redesenhar();
+
+  const cx = $("#desfecho");
+  cx.innerHTML = "";
+  const frase = document.createElement("p");
+  frase.className = "frase venceu";
+  frase.textContent = motivo === "bateu"
+    ? cfg.jogadores[vencedor].nome + " bateu!"
+    : "A mesa trancou. " + cfg.jogadores[vencedor].nome + " tinha menos pontos na mão.";
+  const conta = document.createElement("p");
+  conta.className = "conta";
+  conta.textContent = "Ganhou " + ganhos + (ganhos === 1 ? " ponto" : " pontos") +
+    " · total " + cfg.jogadores[vencedor].pontos + " de " + cfg.alvo;
+  cx.append(frase, conta);
+
+  const acabou = cfg.jogadores[vencedor].pontos >= cfg.alvo;
+  const b = document.createElement("button");
+  b.className = "principal";
+  b.textContent = acabou ? "Ver o resultado" : "Próxima mão";
+  b.addEventListener("click", () => {
+    if(acabou) return fimDaPartida();
+    jogo.mao++;
+    novaMao();
+  });
+  cx.appendChild(b);
+  b.focus();
+}
+
+function fimDaPartida(){
+  jogo.fase = "fim";
+  Som.vitoria();
+  const ordem = cfg.jogadores.slice().sort((a,b) => b.pontos - a.pontos);
+  $("#fimTitulo").textContent = ordem[0].nome + " venceu";
+  $("#fimSub").textContent = jogo.mao + (jogo.mao === 1 ? " mão jogada" : " mãos jogadas") +
+    " · partida até " + cfg.alvo + " pontos";
+  const ol = $("#placarFinal");
+  ol.innerHTML = "";
+  ordem.forEach(j => {
+    const li = document.createElement("li");
+    const bola = document.createElement("span");
+    bola.className = "bolinha"; bola.style.background = j.cor;
+    const nome = document.createElement("span"); nome.textContent = j.nome;
+    const pts = document.createElement("span");
+    pts.style.flex = "0"; pts.style.color = "var(--ink-dim)";
+    pts.textContent = j.pontos;
+    li.append(bola, nome, pts);
+    ol.appendChild(li);
+  });
+  UI.trocarTela("telaFim");
+}
+
+/* ---------------------------------------------------------
+   LIGAÇÕES
+   --------------------------------------------------------- */
+
+UI.iniciar({ titulo:"Dominó", versao:VERSAO, regras:REGRAS, voltar:"index.html" });
+
+$("#btnComecar").addEventListener("click", comecar);
+$("#btnComprar").addEventListener("click", comprar);
+$("#btnPassar").addEventListener("click", passar);
+$("#btnVerMao").addEventListener("click", () => {
+  $("#passagem").classList.remove("ativa");
+  mostrarVez();
+});
+$("#btnSair").addEventListener("click", () => UI.trocarTela("telaPreparo"));
+$("#btnDeNovo").addEventListener("click", comecar);
+$("#btnVoltarPreparo").addEventListener("click", () => UI.trocarTela("telaPreparo"));
+
+montarPreparo();
+</script>
+</body>
+</html>
