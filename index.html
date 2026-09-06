@@ -265,25 +265,27 @@
       <span class="seta" aria-hidden="true">›</span>
     </a>
 
-    <div class="jogo depois">
+    <a class="jogo" href="damas.html">
       <span class="selo" aria-hidden="true">
         <svg viewBox="0 0 100 100">
-          <g style="fill:var(--ink-dim);opacity:.55">
+          <g style="fill:var(--ink-dim);opacity:.45">
             <rect x="14" y="14" width="18" height="18"/><rect x="50" y="14" width="18" height="18"/>
             <rect x="32" y="32" width="18" height="18"/><rect x="68" y="32" width="18" height="18"/>
             <rect x="14" y="50" width="18" height="18"/><rect x="50" y="50" width="18" height="18"/>
             <rect x="32" y="68" width="18" height="18"/><rect x="68" y="68" width="18" height="18"/>
           </g>
-          <circle class="peca-selo cinza" cx="59" cy="23" r="7"/>
-          <circle class="peca-selo cinza" cx="41" cy="77" r="7"/>
+          <circle cx="41" cy="23" r="8" style="fill:var(--carmim-claro)"/>
+          <circle cx="59" cy="77" r="8" style="fill:var(--gold-soft)"/>
+          <circle cx="59" cy="41" r="8" style="fill:var(--gold-soft)"/>
+          <circle cx="59" cy="41" r="3.5" style="fill:none;stroke:rgba(0,0,0,.5);stroke-width:2"/>
         </svg>
       </span>
       <span class="texto">
         <span class="nome">Damas</span>
-        <span class="sobre">Regras brasileiras. A pergunta valeria só na captura.</span>
+        <span class="sobre">Regras brasileiras, captura obrigatória. Para coroar uma dama, responda certo.</span>
       </span>
-      <span class="seta" aria-hidden="true">talvez</span>
-    </div>
+      <span class="seta" aria-hidden="true">›</span>
+    </a>
 
   </div>
 
@@ -297,7 +299,7 @@
 <script src="comum.js"></script>
 <script>
 "use strict";
-UI.iniciar({ titulo:"Arena da Palavra", versao:"1.9.0" });
+UI.iniciar({ titulo:"Arena da Palavra", versao:"1.10.0" });
 </script>
 </body>
 </html>
