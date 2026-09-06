@@ -133,6 +133,17 @@
   </div>
 
   <div class="bloco">
+    <h2>Pedras para cada um</h2>
+    <div class="escolhas" id="escPecas"></div>
+  </div>
+
+  <div class="bloco">
+    <h2>O que sobra</h2>
+    <div class="escolhas" id="escDorme"></div>
+    <p class="legenda" style="margin:14px 0 0" id="legDorme">—</p>
+  </div>
+
+  <div class="bloco">
     <h2>A partida vai até</h2>
     <div class="escolhas" id="escAlvo"></div>
   </div>
@@ -214,15 +225,42 @@
    v1.0.0
    ========================================================= */
 
-const VERSAO = "1.3.1";
+const VERSAO = "2.1.0";
 const CORES_JOGADOR = ["#D4565F", "#C9A227", "#2A5B9C", "#2E6B4F"];
 const PIPS = {0:[],1:[4],2:[0,8],3:[0,4,8],4:[0,2,6,8],5:[0,2,4,6,8],6:[0,2,3,5,6,8]};
+
+/* Contagem por tipo de batida, como se joga na Paraíba:
+     simples 1 · carroça 2 · lá-e-lô 2 · cruzada 4
+   Mesa trancada vale 1 ponto para quem tiver menos pontos na mão. */
+const BATIDAS = {
+  simples: {nome:"Batida simples",  pontos:1},
+  carroca: {nome:"Batida de carroça", pontos:2},
+  laelo:   {nome:"Batida de lá-e-lô", pontos:2},
+  cruzada: {nome:"Batida de cruzada", pontos:4},
+  trancou: {nome:"Mesa trancada",     pontos:1}
+};
+
+function tipoDaBatida(pc, pontas){
+  const dupla = pc[0] === pc[1];
+  const serveEsq = pc[0] === pontas[0] || pc[1] === pontas[0];
+  const serveDir = pc[0] === pontas[1] || pc[1] === pontas[1];
+  const nasDuas = serveEsq && serveDir;
+  if(dupla && nasDuas && pontas[0] === pontas[1]) return "cruzada";
+  if(dupla) return "carroca";
+  if(nasDuas && pontas[0] !== pontas[1]) return "laelo";
+  return "simples";
+}
 
 const REGRAS = `
   <h2>Como se joga</h2>
 
   <h3>As peças</h3>
-  <p>São 28 peças, de zero-zero até seis-seis. Cada jogador recebe sete. O que sobra fica no dorme, de onde se compra.</p>
+  <p>São 28 peças, de zero-zero até seis-seis. Cada jogador recebe seis ou sete, conforme o combinado no preparo.</p>
+
+  <h3>O que sobra: dorme ou pedras dormindo</h3>
+  <p>As pedras que não foram distribuídas podem ter dois destinos, e isso muda o jogo por completo.</p>
+  <p><b>Pode comprar:</b> quem não tem jogada vai comprando até achar uma pedra que sirva. É o dominó de mesa de bar.</p>
+  <p><b>Fica dormindo:</b> aquelas pedras saem do jogo e ninguém toca nelas. Quem não tem jogada simplesmente passa. É a forma mais comum entre quatro jogadores, com seis pedras para cada um e quatro dormindo — e existe justamente para atrapalhar quem conta as pedras, porque nunca se sabe ao certo o que está na mão de quem.</p>
 
   <h3>Quem começa</h3>
   <p>Começa quem tiver a carroça mais alta — o seis-seis, se alguém o tiver, senão o cinco-cinco, e assim por diante. Não havendo carroça, começa quem tem a peça mais pesada.</p>
@@ -239,10 +277,20 @@ const REGRAS = `
   <p>Se ninguém puder jogar e o dorme estiver vazio, a mesa trancou. Ganha a mão quem tiver menos pontos na mão.</p>
 
   <h3>A contagem</h3>
-  <p>Quem ganha a mão soma os pontos que sobraram nas mãos de todos os outros. Vence a partida quem chegar primeiro ao total combinado.</p>
+  <p>Não se contam os pontos das pedras: conta-se o tipo da batida.</p>
+  <ul>
+    <li><b>Simples</b> — 1 ponto.</li>
+    <li><b>Carroça</b> — a última pedra é uma dupla: 2 pontos.</li>
+    <li><b>Lá-e-lô</b> — a última pedra servia nas duas pontas, que tinham números diferentes: 2 pontos.</li>
+    <li><b>Cruzada</b> — a última pedra é uma dupla e as duas pontas eram do número dela: 4 pontos.</li>
+    <li><b>Mesa trancada</b> — 1 ponto para quem tiver menos pontos somados na mão.</li>
+  </ul>
+
+  <h3>Mão impugnada</h3>
+  <p>Se alguém receber cinco ou mais carroças nas sete pedras, a mão não vale: as pedras voltam, embaralham e distribui-se de novo.</p>
 `;
 
-let cfg = { qtd:2, alvo:50, batida:true, jogadores:[] };
+let cfg = { qtd:2, pecas:7, comprar:true, alvo:6, batida:true, jogadores:[] };
 let jogo = null;
 
 /* ---------------------------------------------------------
@@ -251,13 +299,24 @@ let jogo = null;
 
 function montarPreparo(){
   UI.escolhas($("#escQtd"), [2,3,4], cfg.qtd, v => { cfg.qtd = v; montarPreparo(); });
+  UI.escolhas($("#escPecas"),
+    [{valor:6,rotulo:"6 pedras"},{valor:7,rotulo:"7 pedras"}],
+    cfg.pecas, v => { cfg.pecas = v; montarPreparo(); });
+  UI.escolhas($("#escDorme"),
+    [{valor:true,rotulo:"Pode comprar"},{valor:false,rotulo:"Fica dormindo"}],
+    cfg.comprar, v => { cfg.comprar = v; montarPreparo(); });
   UI.escolhas($("#escAlvo"),
-    [{valor:30,rotulo:"30 pontos"},{valor:50,rotulo:"50"},{valor:100,rotulo:"100"}],
+    [{valor:4,rotulo:"4 pontos"},{valor:6,rotulo:"6"},{valor:10,rotulo:"10"}],
     cfg.alvo, v => { cfg.alvo = v; montarPreparo(); });
 
-  $("#legQtd").textContent = cfg.qtd === 4
-    ? "Com quatro jogadores as 28 peças são todas distribuídas: não há dorme para comprar."
-    : "Cada um recebe 7 peças; as " + (28 - cfg.qtd*7) + " restantes ficam no dorme.";
+  const sobram = 28 - cfg.qtd * cfg.pecas;
+  $("#legQtd").textContent = cfg.qtd + " jogadores, " + cfg.pecas + " pedras cada: "
+    + (cfg.qtd * cfg.pecas) + " na mesa e " + sobram + (sobram === 1 ? " de fora." : " de fora.");
+  $("#legDorme").textContent = sobram === 0
+    ? "Com esta distribuição não sobra pedra nenhuma: quem não tem jogada apenas passa a vez."
+    : (cfg.comprar
+        ? "Quem não tiver jogada compra do dorme até achar uma pedra que sirva."
+        : "As " + sobram + " pedras ficam dormindo e não entram mais no jogo. Quem não tiver jogada passa a vez — e ninguém consegue contar as pedras com certeza.");
 
   const anteriores = cfg.jogadores;
   const lista = $("#listaJogadores");
@@ -350,6 +409,7 @@ function desenharPeca(pc, deitada){
 
 function comecar(){
   cfg.batida = $("#optBatida").checked;
+  if(28 - cfg.qtd * cfg.pecas === 0) cfg.comprar = false;
   Banco.zerar();
   cfg.jogadores.forEach(j => j.pontos = 0);
   jogo = { mao:1 };
@@ -358,9 +418,15 @@ function comecar(){
 }
 
 function novaMao(){
-  const pecas = embaralhar(baralho());
-  cfg.jogadores.forEach((j, i) => { j.mao = pecas.slice(i*7, i*7 + 7); });
-  jogo.dorme = pecas.slice(cfg.qtd * 7);
+  let pecas, impugnadas = 0;
+  do {
+    pecas = embaralhar(baralho());
+    cfg.jogadores.forEach((j, i) => { j.mao = pecas.slice(i*cfg.pecas, i*cfg.pecas + cfg.pecas); });
+    var impugnada = cfg.jogadores.some(j => j.mao.filter(carroca).length >= 5);
+    if(impugnada) impugnadas++;
+  } while(impugnada && impugnadas < 50);
+  jogo.impugnadas = impugnadas;
+  jogo.dorme = pecas.slice(cfg.qtd * cfg.pecas);
   jogo.mesa = [];              // peças na ordem em que estão na mesa
   jogo.pontas = [null, null];
   jogo.fase = "jogar";
@@ -377,9 +443,13 @@ function novaMao(){
   });
   jogo.vez = quem;
 
+  jogo.ultimoJogador = null;
   $("#desfecho").innerHTML = "";
   redesenhar();
-  avisar(cfg.jogadores[quem].nome + " começa, com a peça mais alta.");
+  avisar((jogo.impugnadas
+      ? (jogo.impugnadas === 1 ? "Uma mão foi impugnada por cinco carroças. " : jogo.impugnadas + " mãos foram impugnadas. ")
+      : "")
+    + cfg.jogadores[quem].nome + " começa, com a peça mais alta.");
   setTimeout(seguirVez, 900);
 }
 
@@ -562,8 +632,10 @@ function desenharMao(){
   });
 
   $("#botoes").style.display = "flex";
+  $("#btnComprar").style.display = cfg.comprar ? "" : "none";
   $("#btnComprar").disabled = podem.length > 0 || jogo.dorme.length === 0;
-  $("#btnPassar").disabled = podem.length > 0 || jogo.dorme.length > 0;
+  // só se passa quando não há jogada e também não há de onde comprar
+  $("#btnPassar").disabled = podem.length > 0 || (cfg.comprar && jogo.dorme.length > 0);
 }
 
 function avisar(t){ $("#aviso").textContent = t || ""; }
@@ -605,7 +677,9 @@ function mostrarVez(){
   const podem = jogaveis(j.mao);
   avisar(podem.length
     ? j.nome + ", escolha uma peça."
-    : (jogo.dorme.length ? "Nenhuma peça serve. Compre do dorme." : "Nenhuma peça serve e o dorme acabou. Passe a vez."));
+    : (cfg.comprar && jogo.dorme.length
+        ? "Nenhuma peça serve. Compre do dorme."
+        : "Nenhuma peça serve. Passe a vez."));
 }
 
 function escolherPeca(jog){
@@ -686,6 +760,11 @@ function encaixar(indice, lado){
 function assentar(indice, lado){
   const j = atual();
   if(!j.mao[indice]) return;
+
+  // o tipo da batida depende das pontas ANTES desta jogada
+  const tipo = (j.mao.length === 1 && jogo.mesa.length)
+    ? tipoDaBatida(j.mao[indice], jogo.pontas) : null;
+
   const pc = j.mao.splice(indice, 1)[0];
   jogo.escolhida = null;
   jogo.passesSeguidos = 0;
@@ -710,12 +789,14 @@ function assentar(indice, lado){
   redesenhar();
   avisar(j.nome + " jogou " + pc[0] + "-" + pc[1] + ".");
 
-  if(j.mao.length === 0) return setTimeout(() => fimDaMao(jogo.vez, "bateu"), 900);
+  jogo.ultimoJogador = jogo.vez;
+  if(j.mao.length === 0)
+    return setTimeout(() => fimDaMao(jogo.vez, tipo || "simples"), 900);
   setTimeout(passarAdiante, 750);
 }
 
 function comprar(){
-  if(jogo.fase !== "jogar" || jogo.dorme.length === 0) return;
+  if(jogo.fase !== "jogar" || !cfg.comprar || jogo.dorme.length === 0) return;
   const j = atual();
   j.mao.push(jogo.dorme.pop());
   Som.toque();
@@ -729,7 +810,7 @@ function passar(){
   jogo.passesSeguidos++;
   Som.pausa();
   avisar(atual().nome + " passou a vez.");
-  if(jogo.passesSeguidos >= cfg.qtd) return setTimeout(() => fimDaMao(null, "trancou"), 800);
+  if(jogo.passesSeguidos >= cfg.qtd) return setTimeout(() => fimDaMao(null, null), 800);
   setTimeout(passarAdiante, 700);
 }
 
@@ -747,7 +828,7 @@ function jogadaDaMaquina(){
   const j = atual();
   let podem = jogaveis(j.mao);
 
-  while(podem.length === 0 && jogo.dorme.length > 0){
+  while(podem.length === 0 && cfg.comprar && jogo.dorme.length > 0){
     j.mao.push(jogo.dorme.pop());
     podem = jogaveis(j.mao);
   }
@@ -795,21 +876,24 @@ function jogadaDaMaquina(){
    FIM DE MÃO E DE PARTIDA
    --------------------------------------------------------- */
 
-function fimDaMao(vencedor, motivo){
+function fimDaMao(vencedor, tipo){
   jogo.fase = "fim-mao";
 
   if(vencedor === null){
-    // trancou: ganha quem tem menos pontos na mão
-    let menor = Infinity;
+    // trancou: ganha quem tem menos pontos na mão; empate vai para quem jogou por último
+    let menor = Infinity, empatados = [];
     cfg.jogadores.forEach((j, i) => {
       const soma = j.mao.reduce((s, pc) => s + valor(pc), 0);
-      if(soma < menor){ menor = soma; vencedor = i; }
+      if(soma < menor){ menor = soma; empatados = [i]; }
+      else if(soma === menor) empatados.push(i);
     });
+    vencedor = empatados.length > 1 && empatados.includes(jogo.ultimoJogador)
+      ? jogo.ultimoJogador : empatados[0];
+    tipo = "trancou";
   }
 
-  const ganhos = cfg.jogadores.reduce((s, j, i) =>
-    i === vencedor ? s : s + j.mao.reduce((t, pc) => t + valor(pc), 0), 0);
-  cfg.jogadores[vencedor].pontos += ganhos;
+  const batida = BATIDAS[tipo] || BATIDAS.simples;
+  cfg.jogadores[vencedor].pontos += batida.pontos;
 
   Som.chegou();
   redesenhar();
@@ -818,12 +902,12 @@ function fimDaMao(vencedor, motivo){
   cx.innerHTML = "";
   const frase = document.createElement("p");
   frase.className = "frase venceu";
-  frase.textContent = motivo === "bateu"
-    ? cfg.jogadores[vencedor].nome + " bateu!"
-    : "A mesa trancou. " + cfg.jogadores[vencedor].nome + " tinha menos pontos na mão.";
+  frase.textContent = tipo === "trancou"
+    ? "A mesa trancou. " + cfg.jogadores[vencedor].nome + " tinha menos pontos na mão."
+    : cfg.jogadores[vencedor].nome + " bateu — " + batida.nome.toLowerCase() + "!";
   const conta = document.createElement("p");
   conta.className = "conta";
-  conta.textContent = "Ganhou " + ganhos + (ganhos === 1 ? " ponto" : " pontos") +
+  conta.textContent = batida.pontos + (batida.pontos === 1 ? " ponto" : " pontos") +
     " · total " + cfg.jogadores[vencedor].pontos + " de " + cfg.alvo;
   cx.append(frase, conta);
 
@@ -846,7 +930,7 @@ function fimDaPartida(){
   const ordem = cfg.jogadores.slice().sort((a,b) => b.pontos - a.pontos);
   $("#fimTitulo").textContent = ordem[0].nome + " venceu";
   $("#fimSub").textContent = jogo.mao + (jogo.mao === 1 ? " mão jogada" : " mãos jogadas") +
-    " · partida até " + cfg.alvo + " pontos";
+    " · partida de " + cfg.alvo + " pontos";
   const ol = $("#placarFinal");
   ol.innerHTML = "";
   ordem.forEach(j => {
