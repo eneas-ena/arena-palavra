@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0F1B33">
+<title>Gamão — Arena da Palavra</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="32x32" href="icone-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icone-192.png">
+<link rel="apple-touch-icon" href="icone-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Arena da Palavra">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="comum.css">
+<style>
+.placar{display:flex;align-items:stretch;gap:9px;margin-bottom:12px}
+.placar .lado{
+  flex:1;text-align:center;padding:9px 6px;border-radius:10px;
+  background:var(--surface);border:1px solid var(--linha);
+  transition:border-color .2s, background .2s;
+}
+.placar .lado.vez{border-color:var(--cor-lado);background:color-mix(in srgb, var(--cor-lado) 15%, var(--surface))}
+.placar .lado .quem{
+  display:block;font-family:'Cinzel',serif;font-size:12px;color:var(--ink-dim);
+  margin-bottom:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.placar .lado.vez .quem{color:var(--cor-lado)}
+.placar .lado .pontos{font-size:22px;line-height:1;font-family:'Cinzel',serif;color:var(--cor-lado);font-variant-numeric:tabular-nums}
+.placar .lado .detalhe{display:block;font-size:13px;color:var(--ink-dim);min-height:16px}
+.placar .meio{align-self:center;font-size:13px;color:var(--ink-dim);text-align:center;min-width:52px;line-height:1.2}
+
+/* ---------- tabuleiro ---------- */
+.arena{width:100%;max-width:460px;margin:0 auto}
+.tabuleiro{
+  display:grid;
+  grid-template-columns:repeat(6,1fr) 16px repeat(6,1fr) 26px;
+  gap:2px;
+  background:var(--surface);border:1px solid var(--linha);
+  border-radius:10px;padding:6px;
+}
+.ponta{
+  position:relative;min-height:96px;
+  display:flex;flex-direction:column;align-items:center;gap:1px;
+  padding:2px 0;border-radius:4px;
+}
+.ponta.baixo{flex-direction:column-reverse}
+.ponta.par{background:rgba(201,162,39,.09)}
+.ponta.impar{background:rgba(255,255,255,.04)}
+[data-tema="claro"] .ponta.par{background:rgba(120,95,20,.13)}
+[data-tema="claro"] .ponta.impar{background:rgba(0,0,0,.05)}
+.ponta.origem{box-shadow:inset 0 0 0 2px var(--gold)}
+.ponta.destino{background:rgba(201,162,39,.34);cursor:pointer}
+.ponta.destino:hover{background:rgba(201,162,39,.55)}
+.ponta.comendo{background:rgba(212,86,95,.4)}
+.ponta button.toque{position:absolute;inset:0;background:none;border:none;padding:0;cursor:pointer}
+.ponta .conta{
+  position:absolute;left:50%;transform:translateX(-50%);
+  font-size:11px;color:var(--ink);font-family:'Cinzel',serif;
+  background:var(--surface);border-radius:3px;padding:0 3px;
+}
+.ponta.cima .conta{bottom:1px}
+.ponta.baixo .conta{top:1px}
+
+.disco{
+  width:82%;max-width:26px;aspect-ratio:1;border-radius:50%;flex-shrink:0;
+  box-shadow:inset 0 -2px 3px rgba(0,0,0,.4), inset 0 2px 3px rgba(255,255,255,.3);
+}
+.disco.x{background:var(--carmim-claro)}
+.disco.o{background:var(--gold-soft)}
+
+.barra{
+  grid-row:1 / 3;grid-column:7;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  background:var(--surface-2);border-radius:4px;padding:3px 0;
+}
+.barra.destino{background:rgba(201,162,39,.4);cursor:pointer}
+.barra .disco{max-width:14px}
+
+.saida{
+  grid-row:1 / 3;grid-column:14;
+  display:flex;flex-direction:column;justify-content:space-between;
+  background:var(--surface-2);border-radius:4px;padding:4px 2px;
+  font-size:11px;color:var(--ink-dim);text-align:center;font-family:'Cinzel',serif;
+}
+.saida .metade{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border-radius:3px}
+.saida .metade.destino{background:rgba(201,162,39,.45);cursor:pointer}
+.saida .metade b{font-size:15px;color:var(--ink)}
+
+/* ---------- dados ---------- */
+.dados{display:flex;align-items:center;justify-content:center;gap:9px;margin:12px 0 8px;min-height:46px}
+.dado{
+  width:40px;height:40px;border-radius:8px;background:var(--casa);
+  border:1px solid var(--casa-borda);
+  display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);
+  padding:5px;gap:1px;
+}
+.dado i{border-radius:50%;background:#2B2417;width:100%;aspect-ratio:1;visibility:hidden;align-self:center;justify-self:center}
+.dado i.on{visibility:visible}
+.dado.gasto{opacity:.28}
+.dado.rolando{animation:treme .45s ease-in-out}
+@keyframes treme{25%{transform:rotate(-10deg)}75%{transform:rotate(10deg)}}
+@media (prefers-reduced-motion:reduce){.dado.rolando{animation:none}}
+
+.botoes{display:flex;gap:8px;margin-bottom:10px}
+.botoes button{flex:1;padding:13px 8px;font-size:15px}
+
+.desfecho{text-align:center;margin-top:12px}
+.desfecho .frase{font-family:'Cinzel',serif;font-size:19px;margin:0 0 10px}
+.desfecho .frase.venceu{color:var(--gold)}
+</style>
+</head>
+<body>
+
+<header></header>
+
+<main>
+
+<!-- ============ PREPARO ============ -->
+<section class="tela ativa" id="telaPreparo">
+  <div class="bloco">
+    <h2>Quem joga</h2>
+    <div class="escolhas" id="escModo"></div>
+  </div>
+
+  <div class="bloco">
+    <h2>Os jogadores</h2>
+    <div id="listaJogadores"></div>
+  </div>
+
+  <div class="bloco">
+    <h2>Regra da casa</h2>
+    <label class="opcao">
+      <input type="checkbox" id="optDobradinha" checked>
+      <span>Pergunta na dobradinha
+        <small>Dados iguais dão quatro jogadas em vez de duas. Para ficar com as quatro é preciso acertar uma pergunta bíblica; errando, você joga só duas.</small>
+      </span>
+    </label>
+  </div>
+
+  <button class="principal" id="btnComecar">Começar</button>
+</section>
+
+<!-- ============ JOGO ============ -->
+<section class="tela" id="telaJogo">
+  <div class="placar">
+    <div class="lado" id="ladoX"><span class="quem">—</span><span class="pontos">0</span><span class="detalhe"></span></div>
+    <div class="meio" id="meioPlacar">—</div>
+    <div class="lado" id="ladoO"><span class="quem">—</span><span class="pontos">0</span><span class="detalhe"></span></div>
+  </div>
+
+  <div class="arena">
+    <div class="tabuleiro" id="tabuleiro"></div>
+  </div>
+
+  <div class="dados" id="dados"></div>
+
+  <div class="botoes" id="botoes">
+    <button class="principal" id="btnRolar">Rolar os dados</button>
+    <button class="secundario" id="btnDesfazer" style="margin-top:0">Desfazer</button>
+  </div>
+
+  <p class="aviso" id="aviso">—</p>
+  <div class="desfecho" id="desfecho"></div>
+  <button class="secundario" id="btnSair">Encerrar e voltar</button>
+</section>
+
+<!-- ============ FIM ============ -->
+<section class="tela" id="telaFim">
+  <div class="fim">
+    <h2 id="fimTitulo">—</h2>
+    <p class="legenda" id="fimSub">—</p>
+    <button class="principal" id="btnDeNovo">Jogar de novo</button>
+    <button class="secundario" id="btnVoltarPreparo">Mudar as opções</button>
+  </div>
+</section>
+
+</main>
+
+<script src="perguntas.js"></script>
+<script src="comum.js"></script>
+<script>
+"use strict";
+
+/* =========================================================
+   GAMÃO — Arena da Palavra
+   As vermelhas correm da casa 24 para a 1; as douradas, ao contrário.
+   Dados iguais valem quatro jogadas — se a pergunta for respondida.
+   v1.0.0
+   ========================================================= */
+
+const VERSAO = "1.0.0";
+const PIPS = {1:[4],2:[0,8],3:[0,4,8],4:[0,2,6,8],5:[0,2,4,6,8],6:[0,2,3,5,6,8]};
+
+/* Casas 0 a 23. As vermelhas (x) andam de 23 para 0 e saem pelo 0;
+   as douradas (o) andam de 0 para 23 e saem pelo 23. */
+const CASA_X = 24, CASA_O = -1;
+const outra = c => c === "x" ? "o" : "x";
+const rumo  = c => c === "x" ? -1 : 1;
+const casaFora = c => c === "x" ? -1 : 24;
+const emCasa = (c, p) => c === "x" ? p <= 5 : p >= 18;
+
+const REGRAS = `
+  <h2>Como se joga</h2>
+
+  <h3>O objetivo</h3>
+  <p>Trazer as suas quinze pedras para o seu quadrante e depois retirá-las todas do tabuleiro. Quem retirar as quinze primeiro vence.</p>
+
+  <h3>O caminho</h3>
+  <p>As vermelhas correm da direita de cima para a direita de baixo; as douradas fazem o caminho contrário. O quadrante de casa fica sempre à direita.</p>
+
+  <h3>A jogada</h3>
+  <p>Role os dois dados e ande uma pedra o valor de cada um — pode ser a mesma pedra duas vezes ou duas pedras diferentes. Você é obrigado a usar os dois dados se houver como; podendo usar só um, tem de usar o maior.</p>
+
+  <h3>Onde se pode parar</h3>
+  <p>Numa casa vazia, numa casa sua, ou numa casa onde o adversário tenha <b>uma só</b> pedra — nesse caso você a captura, e ela vai para a barra do meio. Casa com duas ou mais pedras do adversário está fechada.</p>
+
+  <h3>A barra</h3>
+  <p>Quem tem pedra na barra não faz mais nada até reentrar com ela no quadrante inicial do adversário. Se não houver casa livre para reentrar, perde a vez.</p>
+
+  <h3>A retirada</h3>
+  <p>Com as quinze pedras no seu quadrante, você começa a retirá-las. O dado tem de corresponder à casa; um dado maior só serve se não houver pedra em casa mais distante.</p>
+
+  <h3>A dobradinha e a pergunta</h3>
+  <p>Dados iguais valem quatro jogadas em vez de duas. Com a regra da casa ligada, acertar a pergunta bíblica garante as quatro; errando, você fica com duas — como num lance comum.</p>
+
+  <h3>A contagem</h3>
+  <p>Vitória simples vale 1 ponto. Se o perdedor não tiver retirado nenhuma pedra, é <b>gamão</b> e vale 2. Se além disso ele ainda tiver pedra na barra ou no quadrante do vencedor, é <b>gamão completo</b> e vale 3.</p>
+`;
+
+const VISAO = {1:{acaso:0.85}, 2:{acaso:0.15}, 3:{acaso:0}};
+
+let cfg = {
+  modo:"maquina",
+  dobradinha:true,
+  jogadores:[
+    {cor:"x", nome:"Você",    tipo:"humano",  nivel:2},
+    {cor:"o", nome:"Máquina", tipo:"maquina", nivel:2}
+  ]
+};
+let jogo = null;
+
+/* ---------------------------------------------------------
+   ESTADO E REGRAS PURAS
+   --------------------------------------------------------- */
+
+function estadoInicial(){
+  const casas = Array(24).fill(null).map(() => ({x:0, o:0}));
+  const por = (p, c, n) => casas[p][c] = n;
+  por(23,"x",2); por(12,"x",5); por(7,"x",3); por(5,"x",5);
+  por(0,"o",2);  por(11,"o",5); por(16,"o",3); por(18,"o",5);
+  return {casas, barra:{x:0,o:0}, fora:{x:0,o:0}};
+}
+
+function clonar(e){
+  return {
+    casas: e.casas.map(c => ({x:c.x, o:c.o})),
+    barra: {x:e.barra.x, o:e.barra.o},
+    fora:  {x:e.fora.x,  o:e.fora.o}
+  };
+}
+
+function todasEmCasa(e, cor){
+  if(e.barra[cor] > 0) return false;
+  for(let p = 0; p < 24; p++)
+    if(e.casas[p][cor] > 0 && !emCasa(cor, p)) return false;
+  return true;
+}
+
+/* a casa mais distante da saída que ainda tem pedra minha */
+function maisDistante(e, cor){
+  if(cor === "x"){ for(let p = 5; p >= 0; p--) if(e.casas[p].x) return p; return -1; }
+  for(let p = 18; p <= 23; p++) if(e.casas[p].o) return p;
+  return -1;
+}
+
+/* lances possíveis usando um dado específico */
+function lancesCom(e, cor, d){
+  const fora = [];
+  const inimiga = outra(cor);
+  const livre = p => e.casas[p][inimiga] <= 1;
+
+  if(e.barra[cor] > 0){
+    const destino = cor === "x" ? 24 - d : d - 1;
+    if(destino >= 0 && destino < 24 && livre(destino))
+      fora.push({de:"barra", para:destino, d});
+    return fora;
+  }
+
+  for(let p = 0; p < 24; p++){
+    if(e.casas[p][cor] === 0) continue;
+    const destino = p + rumo(cor) * d;
+    if(destino >= 0 && destino < 24){
+      if(livre(destino)) fora.push({de:p, para:destino, d});
+      continue;
+    }
+    // saiu do tabuleiro: só vale se todas estiverem em casa
+    if(!todasEmCasa(e, cor)) continue;
+    const distancia = cor === "x" ? p + 1 : 24 - p;
+    if(d === distancia) fora.push({de:p, para:"fora", d});
+    else if(d > distancia && p === maisDistante(e, cor)) fora.push({de:p, para:"fora", d});
+  }
+  return fora;
+}
+
+function aplicarLance(e, cor, m){
+  const novo = clonar(e);
+  const inimiga = outra(cor);
+  if(m.de === "barra") novo.barra[cor]--;
+  else novo.casas[m.de][cor]--;
+
+  if(m.para === "fora"){ novo.fora[cor]++; return novo; }
+
+  if(novo.casas[m.para][inimiga] === 1){
+    novo.casas[m.para][inimiga] = 0;
+    novo.barra[inimiga]++;
+  }
+  novo.casas[m.para][cor]++;
+  return novo;
+}
+
+/* quantos dados ainda dá para usar, no melhor caso */
+function maximoUsavel(e, cor, dados){
+  if(!dados.length) return 0;
+  let melhor = 0;
+  const vistos = new Set();
+  for(let i = 0; i < dados.length; i++){
+    const d = dados[i];
+    if(vistos.has(d)) continue;
+    vistos.add(d);
+    const resto = dados.slice(0, i).concat(dados.slice(i + 1));
+    for(const m of lancesCom(e, cor, d)){
+      const n = 1 + maximoUsavel(aplicarLance(e, cor, m), cor, resto);
+      if(n > melhor) melhor = n;
+      if(melhor === dados.length) return melhor;
+    }
+  }
+  return melhor;
+}
+
+/* lances legais agora, já respeitando a obrigação de usar o máximo de dados
+   e, restando um só, de usar o dado maior */
+function lancesLegais(e, cor, dados){
+  const alvo = maximoUsavel(e, cor, dados);
+  if(alvo === 0) return [];
+
+  let candidatos = [];
+  const vistos = new Set();
+  for(let i = 0; i < dados.length; i++){
+    const d = dados[i];
+    if(vistos.has(d)) continue;
+    vistos.add(d);
+    const resto = dados.slice(0, i).concat(dados.slice(i + 1));
+    for(const m of lancesCom(e, cor, d)){
+      if(1 + maximoUsavel(aplicarLance(e, cor, m), cor, resto) === alvo)
+        candidatos.push(m);
+    }
+  }
+
+  // podendo usar apenas um dado, o maior manda
+  if(alvo === 1 && dados.length > 1){
+    const maior = Math.max(...dados);
+    const comMaior = candidatos.filter(m => m.d === maior);
+    if(comMaior.length) candidatos = comMaior;
+  }
+  return candidatos;
+}
+
+function pip(e, cor){
+  let s = e.barra[cor] * 25;
+  for(let p = 0; p < 24; p++)
+    if(e.casas[p][cor]) s += e.casas[p][cor] * (cor === "x" ? p + 1 : 24 - p);
+  return s;
+}
+
+/* ---------------------------------------------------------
+   PREPARO
+   --------------------------------------------------------- */
+
+function montarPreparo(){
+  UI.escolhas($("#escModo"),
+    [{valor:"maquina", rotulo:"Contra a máquina"}, {valor:"dupla", rotulo:"Dois no aparelho"}],
+    cfg.modo, v => {
+      cfg.modo = v;
+      cfg.jogadores[1].tipo = (v === "maquina") ? "maquina" : "humano";
+      if(v === "maquina" && cfg.jogadores[1].nome === "Jogador 2") cfg.jogadores[1].nome = "Máquina";
+      if(v === "dupla"   && cfg.jogadores[1].nome === "Máquina")   cfg.jogadores[1].nome = "Jogador 2";
+      montarPreparo();
+    });
+
+  const lista = $("#listaJogadores");
+  lista.innerHTML = "";
+  cfg.jogadores.forEach(j => {
+    const linha = document.createElement("div");
+    linha.className = "jogador-linha";
+    const bola = document.createElement("span");
+    bola.className = "bolinha";
+    bola.style.background = j.cor === "x" ? "var(--carmim-claro)" : "var(--gold)";
+    const nome = document.createElement("input");
+    nome.type = "text"; nome.value = j.nome; nome.maxLength = 16;
+    nome.setAttribute("aria-label", "Nome do jogador");
+    nome.addEventListener("input", () => { j.nome = nome.value.trim() || "Jogador"; });
+    const nivel = document.createElement("select");
+    nivel.setAttribute("aria-label", "Nível");
+    [[1,"Fácil"],[2,"Médio"],[3,"Difícil"]].forEach(([v,t]) => {
+      const o = document.createElement("option"); o.value = v; o.textContent = t;
+      if(v === j.nivel) o.selected = true; nivel.appendChild(o);
+    });
+    nivel.addEventListener("change", () => { j.nivel = Number(nivel.value); });
+    linha.append(bola, nome, nivel);
+    lista.appendChild(linha);
+  });
+}
+
+/* ---------------------------------------------------------
+   PARTIDA
+   --------------------------------------------------------- */
+
+function comecar(){
+  cfg.dobradinha = $("#optDobradinha").checked;
+  Banco.zerar();
+  jogo = {
+    e: estadoInicial(),
+    vez: "x",
+    dados: [],
+    valores: [],
+    fase: "rolar",
+    origem: null,
+    historico: []
+  };
+  UI.trocarTela("telaJogo");
+  $("#desfecho").innerHTML = "";
+  montarTabuleiro();
+  seguirVez();
+}
+
+function jogadorDe(c){ return cfg.jogadores.find(j => j.cor === c); }
+
+function montarTabuleiro(){
+  const t = $("#tabuleiro");
+  t.innerHTML = "";
+  // linha de cima: casas 12 a 23; linha de baixo: casas 11 a 0
+  const cima = [], baixo = [];
+  for(let p = 12; p <= 23; p++) cima.push(p);
+  for(let p = 11; p >= 0; p--) baixo.push(p);
+
+  const criar = (p, ondeCima) => {
+    const d = document.createElement("div");
+    d.className = "ponta " + (ondeCima ? "cima" : "baixo") + " " + (p % 2 ? "par" : "impar");
+    d.dataset.p = p;
+    const b = document.createElement("button");
+    b.className = "toque";
+    b.setAttribute("aria-label", "Casa " + (p + 1));
+    b.addEventListener("click", () => tocar(p));
+    d.appendChild(b);
+    return d;
+  };
+
+  cima.slice(0,6).forEach(p => t.appendChild(criar(p, true)));
+  const barra = document.createElement("div");
+  barra.className = "barra"; barra.id = "barra";
+  barra.addEventListener("click", () => tocar("barra"));
+  t.appendChild(barra);
+  cima.slice(6).forEach(p => t.appendChild(criar(p, true)));
+  const saida = document.createElement("div");
+  saida.className = "saida"; saida.id = "saida";
+  saida.innerHTML = '<span class="metade" id="foraO"></span><span class="metade" id="foraX"></span>';
+  t.appendChild(saida);
+  baixo.slice(0,6).forEach(p => t.appendChild(criar(p, false)));
+  baixo.slice(6).forEach(p => t.appendChild(criar(p, false)));
+
+  $("#foraX").addEventListener("click", () => tocar("fora"));
+  $("#foraO").addEventListener("click", () => tocar("fora"));
+  redesenhar();
+}
+
+function redesenhar(){
+  const j = jogadorDe(jogo.vez);
+  const meu = jogo.fase === "mover" && j.tipo === "humano";
+  const legais = meu ? lancesLegais(jogo.e, jogo.vez, jogo.dados) : [];
+  const origens = [...new Set(legais.map(m => m.de))];
+  const destinos = jogo.origem !== null
+    ? legais.filter(m => m.de === jogo.origem).map(m => m.para) : [];
+
+  $$("#tabuleiro .ponta").forEach(d => {
+    const p = Number(d.dataset.p);
+    d.querySelectorAll(".disco, .conta").forEach(x => x.remove());
+    d.classList.remove("origem", "destino", "comendo");
+
+    const c = jogo.e.casas[p];
+    const cor = c.x ? "x" : (c.o ? "o" : null);
+    const n = cor ? c[cor] : 0;
+    for(let k = 0; k < Math.min(n, 5); k++){
+      const disco = document.createElement("span");
+      disco.className = "disco " + cor;
+      d.appendChild(disco);
+    }
+    if(n > 5){
+      const s = document.createElement("span");
+      s.className = "conta"; s.textContent = n;
+      d.appendChild(s);
+    }
+    if(jogo.origem === p) d.classList.add("origem");
+    if(destinos.includes(p)){
+      d.classList.add("destino");
+      if(jogo.e.casas[p][outra(jogo.vez)] === 1) d.classList.add("comendo");
+    }
+    const btn = d.querySelector(".toque");
+    if(btn) btn.disabled = !(meu && (origens.includes(p) || destinos.includes(p) || jogo.origem === p));
+  });
+
+  const barra = $("#barra");
+  barra.innerHTML = "";
+  barra.classList.toggle("destino", destinos.includes("barra"));
+  ["x","o"].forEach(cor => {
+    for(let k = 0; k < Math.min(jogo.e.barra[cor], 4); k++){
+      const disco = document.createElement("span");
+      disco.className = "disco " + cor;
+      barra.appendChild(disco);
+    }
+  });
+  barra.classList.toggle("origem", jogo.origem === "barra");
+
+  $("#foraX").innerHTML = "<b>" + jogo.e.fora.x + "</b>fora";
+  $("#foraO").innerHTML = "<b>" + jogo.e.fora.o + "</b>fora";
+  $("#foraX").classList.toggle("destino", destinos.includes("fora") && jogo.vez === "x");
+  $("#foraO").classList.toggle("destino", destinos.includes("fora") && jogo.vez === "o");
+
+  desenharDados();
+  atualizarPlacar();
+}
+
+function desenharDados(){
+  const cx = $("#dados");
+  cx.innerHTML = "";
+  jogo.valores.forEach((v, i) => {
+    const d = document.createElement("div");
+    d.className = "dado" + (jogo.dados.filter(x => x === v).length <= contarGastos(v, i) ? " gasto" : "");
+    for(let k = 0; k < 9; k++){
+      const p = document.createElement("i");
+      if(PIPS[v].includes(k)) p.className = "on";
+      d.appendChild(p);
+    }
+    cx.appendChild(d);
+  });
+}
+
+function contarGastos(valor, indice){
+  const totais = jogo.valores.filter(x => x === valor).length;
+  const restantes = jogo.dados.filter(x => x === valor).length;
+  const anteriores = jogo.valores.slice(0, indice).filter(x => x === valor).length;
+  return anteriores >= restantes ? anteriores + 1 : 0;
+}
+
+function atualizarPlacar(){
+  ["x","o"].forEach(cor => {
+    const lado = $(cor === "x" ? "#ladoX" : "#ladoO");
+    lado.style.setProperty("--cor-lado", cor === "x" ? "var(--carmim-claro)" : "var(--gold-soft)");
+    $(".quem", lado).textContent = jogadorDe(cor).nome;
+    $(".pontos", lado).textContent = jogo.e.fora[cor];
+    $(".detalhe", lado).textContent = "fora de 15"
+      + (jogo.e.barra[cor] ? " · " + jogo.e.barra[cor] + " na barra" : "");
+    lado.classList.toggle("vez", jogo.vez === cor && jogo.fase !== "fim");
+  });
+  $("#meioPlacar").innerHTML = "pip<br>" + pip(jogo.e, "x") + " a " + pip(jogo.e, "o");
+}
+
+function avisar(t){ $("#aviso").textContent = t || ""; }
+
+/* ---------- vez ---------- */
+
+function seguirVez(){
+  if(jogo.fase === "fim") return;
+  jogo.dados = [];
+  jogo.valores = [];
+  jogo.origem = null;
+  jogo.historico = [];
+  jogo.fase = "rolar";
+  redesenhar();
+
+  const j = jogadorDe(jogo.vez);
+  $("#btnRolar").disabled = j.tipo === "maquina";
+  $("#btnDesfazer").disabled = true;
+  if(j.tipo === "maquina"){
+    avisar(j.nome + " vai rolar…");
+    setTimeout(rolar, 700);
+  } else {
+    avisar(j.nome + ", role os dados.");
+  }
+}
+
+function rolar(){
+  if(jogo.fase !== "rolar") return;
+  jogo.fase = "rolando";
+  $("#btnRolar").disabled = true;
+  Som.chacoalhar();
+
+  const a = 1 + Math.floor(Math.random() * 6);
+  const b = 1 + Math.floor(Math.random() * 6);
+  const dupla = a === b;
+
+  setTimeout(() => {
+    Som.dadoParou();
+    jogo.valores = dupla ? [a,a,a,a] : [a,b];
+    jogo.dados = jogo.valores.slice();
+    redesenhar();
+
+    if(dupla && cfg.dobradinha) return perguntaDaDobradinha(a);
+    if(dupla) avisar("Dobradinha de " + a + ": quatro jogadas.");
+    comecarMovimentos();
+  }, 520);
+}
+
+function perguntaDaDobradinha(valor){
+  const j = jogadorDe(jogo.vez);
+  jogo.fase = "respondendo";
+
+  const cair = () => {
+    jogo.valores = [valor, valor];
+    jogo.dados = jogo.valores.slice();
+    redesenhar();
+  };
+
+  if(j.tipo === "maquina"){
+    const acertou = Math.random() < ACERTO_MAQUINA[j.nivel];
+    return setTimeout(() => {
+      if(acertou){ Som.acerto(); avisar(j.nome + " garantiu as quatro jogadas."); }
+      else { Som.erro(); cair(); avisar(j.nome + " tirou dobradinha mas errou: fica com duas."); }
+      comecarMovimentos();
+    }, 750);
+  }
+
+  Pergunta.abrir({
+    para: j.nome,
+    nivel: j.nivel,
+    texto: a => a ? "Certa. A dobradinha vale as quatro jogadas."
+                  : "Errada. A dobradinha vira um lance comum, de duas jogadas.",
+    aoResponder: (acertou) => {
+      if(!acertou){ cair(); avisar("Ficaram só duas jogadas."); }
+      else avisar("Quatro jogadas!");
+      comecarMovimentos();
+    }
+  });
+}
+
+function comecarMovimentos(){
+  jogo.fase = "mover";
+  jogo.historico = [];
+  seguirMovimento();
+}
+
+function seguirMovimento(){
+  if(jogo.fase === "fim") return;
+  jogo.fase = "mover";
+  jogo.origem = null;
+
+  if(jogo.e.fora[jogo.vez] === 15) return fimDaPartida(jogo.vez);
+
+  const legais = lancesLegais(jogo.e, jogo.vez, jogo.dados);
+  if(legais.length === 0){
+    redesenhar();
+    const j = jogadorDe(jogo.vez);
+    avisar(jogo.dados.length === jogo.valores.length
+      ? j.nome + " não tem jogada e perde a vez."
+      : "Não há mais jogada possível.");
+    return setTimeout(passarVez, 1100);
+  }
+
+  const j = jogadorDe(jogo.vez);
+  redesenhar();
+  $("#btnDesfazer").disabled = jogo.historico.length === 0 || j.tipo === "maquina";
+
+  if(j.tipo === "maquina"){
+    avisar(j.nome + " está pensando…");
+    return setTimeout(jogadaDaMaquina, 500);
+  }
+  avisar(jogo.e.barra[jogo.vez]
+    ? j.nome + ", você tem pedra na barra: precisa reentrar."
+    : j.nome + ", escolha a pedra que vai andar.");
+}
+
+function tocar(p){
+  if(jogo.fase !== "mover") return;
+  if(jogadorDe(jogo.vez).tipo !== "humano") return;
+  const legais = lancesLegais(jogo.e, jogo.vez, jogo.dados);
+
+  if(jogo.origem === null){
+    if(!legais.some(m => m.de === p)) return;
+    jogo.origem = p;
+    Som.toque();
+    return redesenhar();
+  }
+  if(p === jogo.origem){
+    jogo.origem = null;
+    Som.toque();
+    return redesenhar();
+  }
+  const candidatos = legais.filter(m => m.de === jogo.origem && m.para === p);
+  if(!candidatos.length){
+    if(legais.some(m => m.de === p)){ jogo.origem = p; Som.toque(); return redesenhar(); }
+    return;
+  }
+  // havendo dois dados que levam à mesma casa, usa o menor primeiro
+  candidatos.sort((a,b) => a.d - b.d);
+  executar(candidatos[0]);
+}
+
+function executar(m){
+  jogo.historico.push({e:clonar(jogo.e), dados:jogo.dados.slice()});
+  const comeu = m.para !== "fora" && jogo.e.casas[m.para][outra(jogo.vez)] === 1;
+  jogo.e = aplicarLance(jogo.e, jogo.vez, m);
+  jogo.dados.splice(jogo.dados.indexOf(m.d), 1);
+  jogo.origem = null;
+
+  if(m.para === "fora"){ Som.chegou(); avisar("Uma pedra saiu do tabuleiro."); }
+  else if(comeu){ Som.comeu(); avisar("Comeu uma pedra: ela foi para a barra."); }
+  else Som.passo(jogo.dados.length);
+
+  redesenhar();
+  setTimeout(seguirMovimento, comeu ? 700 : 380);
+}
+
+function desfazer(){
+  if(!jogo.historico.length || jogo.fase !== "mover") return;
+  const anterior = jogo.historico.pop();
+  jogo.e = anterior.e;
+  jogo.dados = anterior.dados;
+  jogo.origem = null;
+  Som.toque();
+  seguirMovimento();
+}
+
+function passarVez(){
+  if(jogo.fase === "fim") return;
+  jogo.vez = outra(jogo.vez);
+  seguirVez();
+}
+
+/* ---------------------------------------------------------
+   A MÁQUINA
+   --------------------------------------------------------- */
+
+function avaliar(e, cor){
+  const ele = outra(cor);
+  let nota = (pip(e, ele) - pip(e, cor)) * 1.0;
+  nota += e.fora[cor] * 6 - e.fora[ele] * 6;
+  nota -= e.barra[cor] * 22;
+  nota += e.barra[ele] * 20;
+
+  for(let p = 0; p < 24; p++){
+    const meu = e.casas[p][cor], dele = e.casas[p][ele];
+    if(meu >= 2){
+      nota += 3.5;                                  // casa fechada
+      if(emCasa(cor, p)) nota += 3;                 // fechada dentro de casa vale mais
+    }
+    if(meu === 1){
+      // pedra sozinha corre risco; quanto mais perto do adversário, pior
+      const distancia = cor === "x" ? 24 - p : p + 1;
+      nota -= 7 - Math.min(6, Math.abs(distancia - 12) / 2);
+    }
+    if(dele === 1) nota += 2.5;
+  }
+  return nota;
+}
+
+/* percorre todas as ordens possíveis de usar os dados */
+function melhorSequencia(e, cor, dados, nivel){
+  let melhorNota = -Infinity, melhorSeq = null;
+
+  const andar = (estado, restantes, feitos) => {
+    const legais = lancesLegais(estado, cor, restantes);
+    if(legais.length === 0){
+      const n = avaliar(estado, cor);
+      if(n > melhorNota){ melhorNota = n; melhorSeq = feitos.slice(); }
+      return;
+    }
+    for(const m of legais){
+      const novo = aplicarLance(estado, cor, m);
+      const resto = restantes.slice();
+      resto.splice(resto.indexOf(m.d), 1);
+      feitos.push(m);
+      andar(novo, resto, feitos);
+      feitos.pop();
+    }
+  };
+
+  andar(e, dados, []);
+  return melhorSeq || [];
+}
+
+function jogadaDaMaquina(){
+  const j = jogadorDe(jogo.vez);
+  const legais = lancesLegais(jogo.e, jogo.vez, jogo.dados);
+  if(!legais.length) return seguirMovimento();
+
+  let escolha;
+  if(Math.random() < VISAO[j.nivel].acaso){
+    escolha = legais[Math.floor(Math.random() * legais.length)];
+  } else {
+    const seq = melhorSequencia(jogo.e, jogo.vez, jogo.dados, j.nivel);
+    escolha = seq[0] || legais[0];
+  }
+  executar(escolha);
+}
+
+/* ---------------------------------------------------------
+   FIM
+   --------------------------------------------------------- */
+
+function fimDaPartida(cor){
+  jogo.fase = "fim";
+  const perdedor = outra(cor);
+  let pontos = 1, tipo = "Vitória simples";
+  if(jogo.e.fora[perdedor] === 0){
+    pontos = 2; tipo = "Gamão";
+    const noCampoInimigo = (() => {
+      if(jogo.e.barra[perdedor] > 0) return true;
+      for(let p = 0; p < 24; p++)
+        if(jogo.e.casas[p][perdedor] > 0 && emCasa(cor, p)) return true;
+      return false;
+    })();
+    if(noCampoInimigo){ pontos = 3; tipo = "Gamão completo"; }
+  }
+  Som.vitoria();
+  redesenhar();
+  $("#fimTitulo").textContent = jogadorDe(cor).nome + " venceu";
+  $("#fimSub").textContent = tipo + " · " + pontos + (pontos === 1 ? " ponto" : " pontos");
+  UI.trocarTela("telaFim");
+}
+
+/* ---------------------------------------------------------
+   LIGAÇÕES
+   --------------------------------------------------------- */
+
+UI.iniciar({ titulo:"Gamão", versao:VERSAO, regras:REGRAS, voltar:"index.html" });
+
+$("#btnComecar").addEventListener("click", comecar);
+$("#btnRolar").addEventListener("click", rolar);
+$("#btnDesfazer").addEventListener("click", desfazer);
+$("#btnSair").addEventListener("click", () => UI.trocarTela("telaPreparo"));
+$("#btnDeNovo").addEventListener("click", comecar);
+$("#btnVoltarPreparo").addEventListener("click", () => UI.trocarTela("telaPreparo"));
+
+montarPreparo();
+</script>
+</body>
+</html>

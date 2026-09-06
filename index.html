@@ -65,7 +65,7 @@
 <main>
   <div class="abertura">
     <img class="brasao" src="icone-512.png" alt="Arena da Palavra" width="150" height="150">
-    <p>Jogos de tabuleiro em que só avança quem conhece a Palavra.</p>
+    <p>Doze jogos de tabuleiro em que só avança quem conhece a Palavra.</p>
   </div>
 
   <div class="prateleira">
@@ -287,6 +287,31 @@
       <span class="seta" aria-hidden="true">›</span>
     </a>
 
+    <a class="jogo" href="gamao.html">
+      <span class="selo" aria-hidden="true">
+        <svg viewBox="0 0 100 100">
+          <rect x="10" y="16" width="80" height="68" rx="6"
+                style="fill:none;stroke:var(--gold);stroke-width:4"/>
+          <path style="stroke:var(--gold);stroke-width:3" d="M50 16 V84"/>
+          <g style="fill:var(--carmim-claro)">
+            <path d="M18 20 L30 20 L24 48 Z"/><path d="M58 20 L70 20 L64 48 Z"/>
+          </g>
+          <g style="fill:var(--gold-soft)">
+            <path d="M34 80 L46 80 L40 52 Z"/><path d="M74 80 L86 80 L80 52 Z"/>
+          </g>
+          <g style="fill:var(--ink-dim);opacity:.5">
+            <path d="M34 20 L46 20 L40 48 Z"/><path d="M74 20 L86 20 L80 48 Z"/>
+            <path d="M18 80 L30 80 L24 52 Z"/><path d="M58 80 L70 80 L64 52 Z"/>
+          </g>
+        </svg>
+      </span>
+      <span class="texto">
+        <span class="nome">Gamão</span>
+        <span class="sobre">Corra as quinze pedras até o fim. Dobradinha só vale quatro se acertar.</span>
+      </span>
+      <span class="seta" aria-hidden="true">›</span>
+    </a>
+
   </div>
 
   <p class="rodape">
@@ -299,7 +324,7 @@
 <script src="comum.js"></script>
 <script>
 "use strict";
-UI.iniciar({ titulo:"Arena da Palavra", versao:"1.10.0" });
+UI.iniciar({ titulo:"Arena da Palavra", versao:"2.0.0" });
 </script>
 </body>
 </html>
