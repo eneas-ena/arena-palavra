@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0F1B33">
+<title>Quem Sou Eu — Arena da Palavra</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="32x32" href="icone-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icone-192.png">
+<link rel="apple-touch-icon" href="icone-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Arena da Palavra">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="comum.css">
+<style>
+.faixa{display:flex;align-items:stretch;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+.faixa .lado{
+  flex:1;min-width:78px;text-align:center;padding:9px 6px;border-radius:9px;
+  background:var(--surface);border:1px solid var(--linha);
+  transition:border-color .2s, background .2s;
+}
+.faixa .lado.vez{border-color:var(--cor-lado);background:color-mix(in srgb, var(--cor-lado) 15%, var(--surface))}
+.faixa .lado .quem{
+  display:block;font-family:'Cinzel',serif;font-size:12px;color:var(--ink-dim);
+  margin-bottom:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.faixa .lado.vez .quem{color:var(--cor-lado)}
+.faixa .lado .pontos{font-size:23px;line-height:1;font-family:'Cinzel',serif;color:var(--cor-lado);font-variant-numeric:tabular-nums}
+
+.cabecalho{
+  display:flex;align-items:baseline;justify-content:space-between;gap:10px;
+  margin-bottom:9px;
+}
+.cabecalho .grupo{font-family:'Cinzel',serif;font-size:13px;color:var(--gold)}
+.cabecalho .vale{font-size:15px;color:var(--ink-dim)}
+.cabecalho .vale b{color:var(--gold-soft);font-family:'Cinzel',serif}
+
+.pistas{list-style:none;padding:0;margin:0 0 16px}
+.pistas li{
+  display:flex;gap:11px;padding:12px 13px;margin-bottom:8px;
+  background:var(--surface);border:1px solid var(--linha);border-radius:10px;
+  border-left:4px solid var(--gold);
+  font-size:18px;line-height:1.35;
+  animation:entra .3s ease-out;
+}
+.pistas li .num{
+  font-family:'Cinzel',serif;font-size:14px;color:var(--gold);
+  flex-shrink:0;padding-top:3px;min-width:16px;
+}
+@keyframes entra{from{opacity:0;transform:translateY(-7px)}}
+@media (prefers-reduced-motion:reduce){.pistas li{animation:none}}
+
+.botoes{display:flex;gap:9px;margin-bottom:12px}
+.botoes button{flex:1}
+.principal.menor{padding:13px 8px;font-size:15px}
+.secundario.menor{margin-top:0;padding:13px 8px;font-size:15px;border-color:var(--gold);color:var(--gold)}
+
+.suspeitos{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:10px}
+@media (min-width:430px){ .suspeitos{grid-template-columns:repeat(3,1fr)} }
+.suspeito{
+  padding:13px 8px;border-radius:8px;border:1px solid var(--linha);
+  background:var(--surface-2);font-size:16px;text-align:center;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.suspeito:not(:disabled):hover{border-color:var(--gold)}
+.suspeito.riscado{opacity:.32;text-decoration:line-through;cursor:default}
+.suspeito.certo{background:#1E5B3C;border-color:#3E9268;color:#F2EDE1;opacity:1;text-decoration:none}
+
+.veredito{
+  margin-top:6px;padding:13px;border-radius:10px;
+  background:var(--surface);border:1px solid var(--linha);
+  border-left:4px solid var(--gold);
+}
+.veredito .nome{font-family:'Cinzel',serif;font-size:20px;color:var(--gold);display:block;margin-bottom:3px}
+.veredito .conta{font-size:16px;color:var(--ink-dim);display:block;margin-bottom:2px}
+.veredito .ref{font-size:15px;color:var(--gold-soft)}
+</style>
+</head>
+<body>
+
+<header></header>
+
+<main>
+
+<!-- ============ PREPARO ============ -->
+<section class="tela ativa" id="telaPreparo">
+  <div class="bloco">
+    <h2>Quantos jogam</h2>
+    <div class="escolhas" id="escQtd"></div>
+  </div>
+
+  <div class="bloco">
+    <h2>Quantas rodadas</h2>
+    <div class="escolhas" id="escRodadas"></div>
+    <p class="legenda" style="margin:14px 0 0" id="legRodadas">—</p>
+  </div>
+
+  <div class="bloco">
+    <h2>Os jogadores</h2>
+    <div id="listaJogadores"></div>
+  </div>
+
+  <button class="principal" id="btnComecar">Começar</button>
+</section>
+
+<!-- ============ JOGO ============ -->
+<section class="tela" id="telaJogo">
+  <div class="faixa" id="faixa"></div>
+
+  <div class="cabecalho">
+    <span class="grupo" id="grupo">—</span>
+    <span class="vale" id="vale">—</span>
+  </div>
+
+  <ol class="pistas" id="pistas"></ol>
+
+  <div class="botoes" id="botoes">
+    <button class="principal menor" id="btnArriscar">Já sei quem é</button>
+    <button class="secundario menor" id="btnMaisUma">Pedir outra pista</button>
+  </div>
+
+  <div class="suspeitos" id="suspeitos" style="display:none"></div>
+  <div id="veredito"></div>
+
+  <p class="aviso" id="aviso">—</p>
+  <button class="secundario" id="btnSair">Encerrar e voltar</button>
+</section>
+
+<!-- ============ FIM ============ -->
+<section class="tela" id="telaFim">
+  <div class="fim">
+    <h2 id="fimTitulo">—</h2>
+    <p class="legenda" id="fimSub">—</p>
+    <ol class="placar-lista" id="placarFinal"></ol>
+    <button class="principal" id="btnDeNovo">Jogar de novo</button>
+    <button class="secundario" id="btnVoltarPreparo">Mudar as opções</button>
+  </div>
+</section>
+
+</main>
+
+<script src="personagens.js"></script>
+<script src="comum.js"></script>
+<script>
+"use strict";
+
+/* =========================================================
+   QUEM SOU EU — Arena da Palavra
+   Cinco pistas em primeira pessoa, da mais obscura à mais óbvia.
+   Quanto menos pistas você usar, mais vale o acerto.
+   v1.0.0
+   ========================================================= */
+
+const VERSAO = "1.0.0";
+const VALOR = [5, 4, 3, 2, 1];       // pontos conforme a pista em que você acerta
+const SUSPEITOS = 6;                  // nomes na lista de palpites
+
+const CORES_JOGADOR = ["#D4565F", "#C9A227", "#2A5B9C", "#2E6B4F"];
+
+const REGRAS = `
+  <h2>Como se joga</h2>
+
+  <h3>O objetivo</h3>
+  <p>Descobrir de qual personagem da Bíblia são as pistas. Elas vêm em primeira pessoa, como se ele mesmo estivesse falando.</p>
+
+  <h3>As pistas valem pontos</h3>
+  <p>A primeira pista é a mais difícil e vale 5 pontos. A cada pista que você pede, o acerto vale menos: 4, 3, 2 e, na última, 1 ponto. Arriscar cedo é a jogada corajosa.</p>
+
+  <h3>O palpite</h3>
+  <p>Ao tocar em "já sei quem é", aparece uma lista de suspeitos do mesmo trecho da Bíblia. Errar risca aquele nome da lista, revela mais uma pista e derruba o valor do acerto.</p>
+
+  <h3>Se as cinco acabarem</h3>
+  <p>Quem não acertar depois da última pista não pontua naquela rodada, e o nome é revelado com a referência bíblica.</p>
+
+  <h3>Jogando acompanhado</h3>
+  <p>Cada jogador recebe o seu próprio personagem na sua vez. Vence quem somar mais pontos ao fim das rodadas combinadas.</p>
+
+  <h3>Os níveis</h3>
+  <p>Fácil traz os personagens que todo mundo conhece. Difícil traz gente como Balaão, Coré e Apolo — que estão lá, mas passam despercebidos.</p>
+`;
+
+let cfg = { qtd:1, rodadas:5, jogadores:[] };
+let jogo = null;
+
+/* ---------------------------------------------------------
+   PREPARO
+   --------------------------------------------------------- */
+
+function montarPreparo(){
+  UI.escolhas($("#escQtd"), [1,2,3,4], cfg.qtd, v => { cfg.qtd = v; montarPreparo(); });
+  UI.escolhas($("#escRodadas"),
+    [{valor:3,rotulo:"3"},{valor:5,rotulo:"5"},{valor:8,rotulo:"8"}],
+    cfg.rodadas, v => { cfg.rodadas = v; montarPreparo(); });
+
+  $("#legRodadas").textContent = cfg.qtd === 1
+    ? cfg.rodadas + " personagens, valendo até " + (cfg.rodadas * 5) + " pontos."
+    : cfg.rodadas + " rodadas para cada um. Vence quem somar mais pontos.";
+
+  const anteriores = cfg.jogadores;
+  const lista = $("#listaJogadores");
+  lista.innerHTML = "";
+  cfg.jogadores = [];
+
+  for(let i = 0; i < cfg.qtd; i++){
+    const velho = anteriores[i] || {};
+    const j = {
+      nome: velho.nome || (i === 0 ? "Você" : "Jogador " + (i+1)),
+      nivel: velho.nivel || 2,
+      cor: CORES_JOGADOR[i],
+      pontos: 0
+    };
+    const linha = document.createElement("div");
+    linha.className = "jogador-linha";
+    const bola = document.createElement("span");
+    bola.className = "bolinha"; bola.style.background = j.cor;
+    const nome = document.createElement("input");
+    nome.type = "text"; nome.value = j.nome; nome.maxLength = 16;
+    nome.setAttribute("aria-label", "Nome do jogador " + (i+1));
+    nome.addEventListener("input", () => { j.nome = nome.value.trim() || ("Jogador " + (i+1)); });
+    const nivel = document.createElement("select");
+    nivel.setAttribute("aria-label", "Nível dos personagens");
+    [[1,"Fácil"],[2,"Médio"],[3,"Difícil"]].forEach(([v,t]) => {
+      const o = document.createElement("option"); o.value = v; o.textContent = t;
+      if(v === j.nivel) o.selected = true; nivel.appendChild(o);
+    });
+    nivel.addEventListener("change", () => { j.nivel = Number(nivel.value); });
+    linha.append(bola, nome, nivel);
+    lista.appendChild(linha);
+    cfg.jogadores.push(j);
+  }
+}
+
+/* ---------------------------------------------------------
+   PARTIDA
+   --------------------------------------------------------- */
+
+function embaralhar(a){
+  for(let i = a.length - 1; i > 0; i--){
+    const k = Math.floor(Math.random() * (i + 1));
+    [a[i], a[k]] = [a[k], a[i]];
+  }
+  return a;
+}
+
+function comecar(){
+  Fichas.zerar();
+  cfg.jogadores.forEach(j => j.pontos = 0);
+  jogo = { rodada:1, vez:0, ficha:null, pistas:0, suspeitos:[], riscados:[], fase:"pista" };
+  UI.trocarTela("telaJogo");
+  montarFaixa();
+  novaFicha();
+}
+
+function atual(){ return cfg.jogadores[jogo.vez]; }
+
+function montarFaixa(){
+  const f = $("#faixa");
+  f.innerHTML = "";
+  cfg.jogadores.forEach(j => {
+    const d = document.createElement("div");
+    d.className = "lado";
+    d.style.setProperty("--cor-lado", j.cor);
+    d.innerHTML = '<span class="quem"></span><span class="pontos">0</span>';
+    $(".quem", d).textContent = j.nome;
+    f.appendChild(d);
+  });
+  atualizarFaixa();
+}
+
+function atualizarFaixa(){
+  $$("#faixa .lado").forEach((d, i) => {
+    $(".pontos", d).textContent = cfg.jogadores[i].pontos;
+    d.classList.toggle("vez", i === jogo.vez && jogo.fase !== "fim");
+  });
+}
+
+function novaFicha(){
+  const j = atual();
+  const ficha = Fichas.sortear(j.nivel);
+
+  // a lista de suspeitos vem do mesmo trecho da Bíblia que o personagem
+  const elenco = (ELENCO[ficha.g] || []).filter(n => n !== ficha.n);
+  const outros = embaralhar(elenco.slice()).slice(0, SUSPEITOS - 1);
+  const suspeitos = embaralhar(outros.concat([ficha.n]));
+
+  jogo.ficha = ficha;
+  jogo.pistas = 1;
+  jogo.suspeitos = suspeitos;
+  jogo.riscados = [];
+  jogo.fase = "pista";
+
+  $("#grupo").textContent = GRUPOS[ficha.g] || "Bíblia";
+  $("#suspeitos").style.display = "none";
+  $("#veredito").innerHTML = "";
+  $("#botoes").style.display = "flex";
+  $("#btnMaisUma").disabled = false;
+  $("#btnArriscar").disabled = false;
+
+  desenharPistas();
+  atualizarFaixa();
+  avisar(cfg.qtd === 1
+    ? "Rodada " + jogo.rodada + " de " + cfg.rodadas + "."
+    : j.nome + ", é a sua vez. Rodada " + jogo.rodada + " de " + cfg.rodadas + ".");
+}
+
+function desenharPistas(){
+  const ol = $("#pistas");
+  ol.innerHTML = "";
+  for(let i = 0; i < jogo.pistas; i++){
+    const li = document.createElement("li");
+    const num = document.createElement("span");
+    num.className = "num"; num.textContent = (i + 1) + ".";
+    const txt = document.createElement("span");
+    txt.textContent = jogo.ficha.p[i];
+    li.append(num, txt);
+    ol.appendChild(li);
+  }
+  const vale = VALOR[jogo.pistas - 1];
+  $("#vale").innerHTML = "acertar agora vale <b>" + vale + "</b> " + (vale === 1 ? "ponto" : "pontos");
+  $("#btnMaisUma").textContent = jogo.pistas >= 5
+    ? "Não há mais pistas"
+    : "Pedir outra pista (cai para " + VALOR[jogo.pistas] + ")";
+  $("#btnMaisUma").disabled = jogo.pistas >= 5;
+}
+
+function avisar(t){ $("#aviso").textContent = t || ""; }
+
+/* ---------- as ações ---------- */
+
+function maisUmaPista(){
+  if(jogo.fase !== "pista" || jogo.pistas >= 5) return;
+  jogo.pistas++;
+  Som.toque();
+  desenharPistas();
+  if(jogo.pistas >= 5) avisar("Última pista. Agora é arriscar ou passar.");
+}
+
+function abrirSuspeitos(){
+  if(jogo.fase === "fim") return;
+  jogo.fase = "palpite";
+  Som.toque();
+  $("#botoes").style.display = "none";
+
+  const cx = $("#suspeitos");
+  cx.innerHTML = "";
+  jogo.suspeitos.forEach(nome => {
+    const b = document.createElement("button");
+    b.className = "suspeito" + (jogo.riscados.includes(nome) ? " riscado" : "");
+    b.textContent = nome;
+    b.disabled = jogo.riscados.includes(nome);
+    b.addEventListener("click", () => palpitar(nome, b));
+    cx.appendChild(b);
+  });
+  cx.style.display = "grid";
+  avisar("Quem é?");
+}
+
+function palpitar(nome, botao){
+  if(jogo.fase !== "palpite") return;
+
+  if(nome === jogo.ficha.n){
+    jogo.fase = "fim-rodada";
+    botao.classList.add("certo");
+    $$("#suspeitos .suspeito").forEach(b => b.disabled = true);
+    const ganhos = VALOR[jogo.pistas - 1];
+    atual().pontos += ganhos;
+    Som.vitoria();
+    atualizarFaixa();
+    return fecharRodada(true, ganhos);
+  }
+
+  jogo.riscados.push(nome);
+  botao.classList.add("riscado");
+  botao.disabled = true;
+  Som.erro();
+
+  if(jogo.pistas >= 5){
+    jogo.fase = "fim-rodada";
+    $$("#suspeitos .suspeito").forEach(b => b.disabled = true);
+    return fecharRodada(false, 0);
+  }
+
+  jogo.pistas++;
+  jogo.fase = "pista";
+  desenharPistas();
+  $("#suspeitos").style.display = "none";
+  $("#botoes").style.display = "flex";
+  avisar("Não é " + nome + ". Veio mais uma pista, e o acerto vale menos.");
+}
+
+function fecharRodada(acertou, ganhos){
+  $("#botoes").style.display = "none";
+  avisar("");
+
+  const cx = $("#veredito");
+  cx.innerHTML = "";
+  const cartao = document.createElement("div");
+  cartao.className = "veredito";
+  const nome = document.createElement("span");
+  nome.className = "nome";
+  nome.textContent = jogo.ficha.n;
+  const conta = document.createElement("span");
+  conta.className = "conta";
+  conta.textContent = acertou
+    ? atual().nome + " acertou com " + jogo.pistas + (jogo.pistas === 1 ? " pista" : " pistas") + ": " + ganhos + (ganhos === 1 ? " ponto" : " pontos")
+    : "Ninguém acertou desta vez.";
+  const ref = document.createElement("span");
+  ref.className = "ref";
+  ref.textContent = jogo.ficha.r;
+  cartao.append(nome, conta, ref);
+  cx.appendChild(cartao);
+
+  if(!acertou) Som.pausa();
+
+  const ultimaVez = jogo.vez === cfg.jogadores.length - 1;
+  const acabou = ultimaVez && jogo.rodada >= cfg.rodadas;
+
+  const b = document.createElement("button");
+  b.className = "principal";
+  b.style.marginTop = "12px";
+  b.textContent = acabou ? "Ver o resultado" : "Continuar";
+  b.addEventListener("click", () => {
+    if(acabou) return fimDaPartida();
+    if(ultimaVez) jogo.rodada++;
+    jogo.vez = (jogo.vez + 1) % cfg.jogadores.length;
+    $("#suspeitos").style.display = "none";
+    novaFicha();
+  });
+  cx.appendChild(b);
+  b.focus();
+}
+
+/* ---------- fim ---------- */
+
+function fimDaPartida(){
+  jogo.fase = "fim";
+  Som.vitoria();
+  const ordem = cfg.jogadores.slice().sort((a,b) => b.pontos - a.pontos);
+  const maximo = cfg.rodadas * 5;
+
+  if(cfg.jogadores.length === 1){
+    const p = ordem[0].pontos;
+    $("#fimTitulo").textContent = p + " de " + maximo + " pontos";
+    $("#fimSub").textContent = p >= maximo * 0.8 ? "Você conhece essa gente de perto."
+      : p >= maximo * 0.5 ? "Bom resultado. Dá para arriscar mais cedo."
+      : "Vale voltar às histórias e tentar de novo.";
+    $("#placarFinal").innerHTML = "";
+  } else {
+    const empate = ordem[0].pontos === ordem[1].pontos;
+    $("#fimTitulo").textContent = empate ? "Empate" : ordem[0].nome + " venceu";
+    $("#fimSub").textContent = cfg.rodadas + (cfg.rodadas === 1 ? " rodada" : " rodadas") +
+      " · até " + maximo + " pontos possíveis";
+    const ol = $("#placarFinal");
+    ol.innerHTML = "";
+    ordem.forEach(j => {
+      const li = document.createElement("li");
+      const bola = document.createElement("span");
+      bola.className = "bolinha"; bola.style.background = j.cor;
+      const nome = document.createElement("span"); nome.textContent = j.nome;
+      const pts = document.createElement("span");
+      pts.style.flex = "0"; pts.style.color = "var(--ink-dim)";
+      pts.textContent = j.pontos;
+      li.append(bola, nome, pts);
+      ol.appendChild(li);
+    });
+  }
+  UI.trocarTela("telaFim");
+}
+
+/* ---------------------------------------------------------
+   LIGAÇÕES
+   --------------------------------------------------------- */
+
+UI.iniciar({ titulo:"Quem Sou Eu", versao:VERSAO, regras:REGRAS, voltar:"index.html" });
+
+$("#btnComecar").addEventListener("click", comecar);
+$("#btnMaisUma").addEventListener("click", maisUmaPista);
+$("#btnArriscar").addEventListener("click", abrirSuspeitos);
+$("#btnSair").addEventListener("click", () => UI.trocarTela("telaPreparo"));
+$("#btnDeNovo").addEventListener("click", comecar);
+$("#btnVoltarPreparo").addEventListener("click", () => UI.trocarTela("telaPreparo"));
+
+montarPreparo();
+</script>
+</body>
+</html>
