@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0F1B33">
+<title>Moinho — Arena da Palavra</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="32x32" href="icone-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icone-192.png">
+<link rel="apple-touch-icon" href="icone-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Arena da Palavra">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="comum.css">
+<style>
+.placar{display:flex;align-items:stretch;gap:10px;margin-bottom:14px}
+.placar .lado{
+  flex:1;text-align:center;padding:10px 8px;border-radius:10px;
+  background:var(--surface);border:1px solid var(--linha);
+  transition:border-color .2s, background .2s;
+}
+.placar .lado.vez{border-color:var(--cor-lado);background:color-mix(in srgb, var(--cor-lado) 14%, var(--surface))}
+.placar .lado .quem{
+  display:block;font-family:'Cinzel',serif;font-size:13px;color:var(--ink-dim);
+  margin-bottom:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.placar .lado.vez .quem{color:var(--cor-lado)}
+.placar .estoque{display:flex;justify-content:center;gap:3px;flex-wrap:wrap;min-height:13px}
+.placar .estoque i{width:11px;height:11px;border-radius:50%;background:var(--cor-lado);display:block}
+.placar .estoque i.usada{opacity:.22}
+.placar .contas{display:block;font-size:14px;color:var(--ink-dim);margin-top:5px}
+.placar .meio{align-self:center;font-size:13px;color:var(--ink-dim);text-align:center;min-width:56px;line-height:1.25}
+
+.arena{width:100%;max-width:400px;margin:0 auto}
+#tabuleiro{width:100%;aspect-ratio:1;display:block;overflow:visible}
+.trilho{stroke:var(--gold);stroke-width:1.5;fill:none;opacity:.6;stroke-linecap:round}
+.ponto{fill:var(--surface-2);stroke:var(--gold);stroke-width:1;opacity:.75;cursor:default}
+.ponto.aberto{cursor:pointer;fill:var(--surface-2)}
+.ponto.aberto:hover{fill:var(--gold);opacity:1}
+.peca{stroke-width:1.2;stroke:rgba(0,0,0,.35)}
+.peca.x{fill:var(--carmim-claro)}
+.peca.o{fill:var(--gold-soft)}
+.peca.pousando{animation:pousa .28s ease-out}
+@keyframes pousa{from{opacity:0;transform:scale(.4);transform-origin:center;transform-box:fill-box}}
+.peca.escolhivel{cursor:pointer;stroke:var(--ink);stroke-width:2;animation:pulsa 1.1s ease-in-out infinite}
+.peca.selecionada{stroke:var(--ink);stroke-width:2.5}
+.peca.removivel{cursor:pointer;stroke:#F2EDE1;stroke-width:2;animation:pulsa .9s ease-in-out infinite}
+@keyframes pulsa{50%{opacity:.55}}
+.destino{fill:var(--gold);opacity:.5;cursor:pointer}
+.destino:hover{opacity:.95}
+.moinho{stroke:var(--ink);stroke-width:2.5;stroke-linecap:round;opacity:.8}
+@media (prefers-reduced-motion:reduce){.peca.pousando,.peca.escolhivel,.peca.removivel{animation:none}}
+
+.desfecho{text-align:center;margin-top:14px}
+.desfecho .frase{font-family:'Cinzel',serif;font-size:19px;margin:0 0 10px}
+.desfecho .frase.venceu{color:var(--gold)}
+</style>
+</head>
+<body>
+
+<header></header>
+
+<main>
+
+<!-- ============ PREPARO ============ -->
+<section class="tela ativa" id="telaPreparo">
+  <div class="bloco">
+    <h2>Quem joga</h2>
+    <div class="escolhas" id="escModo"></div>
+  </div>
+
+  <div class="bloco">
+    <h2>Os jogadores</h2>
+    <div id="listaJogadores"></div>
+  </div>
+
+  <button class="principal" id="btnComecar">Começar</button>
+</section>
+
+<!-- ============ JOGO ============ -->
+<section class="tela" id="telaJogo">
+  <div class="placar">
+    <div class="lado" id="ladoX">
+      <span class="quem">—</span>
+      <span class="estoque"></span>
+      <span class="contas">—</span>
+    </div>
+    <div class="meio" id="meioPlacar">—</div>
+    <div class="lado" id="ladoO">
+      <span class="quem">—</span>
+      <span class="estoque"></span>
+      <span class="contas">—</span>
+    </div>
+  </div>
+
+  <div class="arena">
+    <svg id="tabuleiro" viewBox="0 0 100 100" aria-label="Tabuleiro do moinho">
+      <g id="trilhos"></g>
+      <g id="pontos"></g>
+      <g id="pecas"></g>
+      <g id="marcas"></g>
+    </svg>
+  </div>
+
+  <p class="aviso" id="aviso">—</p>
+  <div class="desfecho" id="desfecho"></div>
+  <button class="secundario" id="btnSair">Encerrar e voltar</button>
+</section>
+
+<!-- ============ FIM ============ -->
+<section class="tela" id="telaFim">
+  <div class="fim">
+    <h2 id="fimTitulo">—</h2>
+    <p class="legenda" id="fimSub">—</p>
+    <button class="principal" id="btnDeNovo">Jogar de novo</button>
+    <button class="secundario" id="btnVoltarPreparo">Mudar as opções</button>
+  </div>
+</section>
+
+</main>
+
+<script src="perguntas.js"></script>
+<script src="comum.js"></script>
+<script>
+"use strict";
+
+/* =========================================================
+   MOINHO — Arena da Palavra
+   Alinhou três, responde a pergunta. Acertou, tira uma peça
+   do adversário. Errou, o moinho não vale nada desta vez.
+   v1.0.0
+   ========================================================= */
+
+const VERSAO = "1.0.1";
+const PECAS = 9;
+const LANCES_SEM_PROGRESSO = 40;   // sem nenhuma peça sair, a partida empata
+
+/* Os 24 pontos, em linha e coluna de uma grade imaginária de 7 por 7 */
+const GRADE = [
+  [0,0],[0,3],[0,6],
+  [1,1],[1,3],[1,5],
+  [2,2],[2,3],[2,4],
+  [3,0],[3,1],[3,2],   [3,4],[3,5],[3,6],
+  [4,2],[4,3],[4,4],
+  [5,1],[5,3],[5,5],
+  [6,0],[6,3],[6,6]
+];
+
+const MOINHOS = [
+  [0,1,2],[3,4,5],[6,7,8],[9,10,11],[12,13,14],[15,16,17],[18,19,20],[21,22,23],
+  [0,9,21],[3,10,18],[6,11,15],[1,4,7],[16,19,22],[8,12,17],[5,13,20],[2,14,23]
+];
+
+const VIZINHOS = [
+  [1,9],[0,2,4],[1,14],
+  [4,10],[1,3,5,7],[4,13],
+  [7,11],[4,6,8],[7,12],
+  [0,10,21],[3,9,11,18],[6,10,15],   [8,13,17],[5,12,14,20],[2,13,23],
+  [11,16],[15,17,19],[12,16],
+  [10,19],[16,18,20,22],[13,19],
+  [9,22],[19,21,23],[14,22]
+];
+
+const px = c => 5 + c * 15;
+const py = l => 5 + l * 15;
+const X = i => px(GRADE[i][1]);
+const Y = i => py(GRADE[i][0]);
+
+const REGRAS = `
+  <h2>Como se joga</h2>
+
+  <h3>O objetivo</h3>
+  <p>Deixar o adversário com apenas duas peças, ou sem nenhum movimento possível.</p>
+
+  <h3>As três fases</h3>
+  <p><b>Colocar:</b> cada um tem nove peças e vai pondo uma por vez em qualquer ponto vazio.</p>
+  <p><b>Mover:</b> acabadas as peças da mão, cada jogada move uma peça para um ponto vizinho pela linha.</p>
+  <p><b>Voar:</b> quem fica com só três peças passa a poder saltar para qualquer ponto vazio do tabuleiro. É a última chance de quem está perdendo.</p>
+
+  <h3>O moinho</h3>
+  <p>Alinhar três peças suas numa mesma linha do tabuleiro é fazer um moinho. Quando isso acontece, aparece uma pergunta bíblica: acertando, você tira uma peça do adversário; errando, o moinho não rende nada desta vez.</p>
+  <p>Não se pode tirar uma peça que esteja dentro de um moinho, a menos que todas as peças do adversário estejam.</p>
+
+  <h3>Desfazer e refazer</h3>
+  <p>Tirar uma peça de um moinho e recolocá-la depois forma o moinho de novo, e vale de novo. Um moinho que abre e fecha é a arma mais forte do jogo.</p>
+
+  <h3>Quando dá empate</h3>
+  <p>Se passarem quarenta lances sem nenhuma peça sair do tabuleiro, a partida está travada e termina empatada. Sem essa regra, dois jogadores parelhos podem empurrar peças a noite inteira.</p>
+
+  <h3>Por que o meio importa menos</h3>
+  <p>Os pontos que cruzam mais linhas — os do meio de cada lado — participam de mais moinhos possíveis. Disputá-los cedo costuma decidir a partida.</p>
+`;
+
+let cfg = {
+  modo:"maquina",
+  jogadores:[
+    {marca:"X", nome:"Você",    tipo:"humano",  nivel:2},
+    {marca:"O", nome:"Máquina", tipo:"maquina", nivel:2}
+  ]
+};
+let jogo = null;
+
+/* ---------------------------------------------------------
+   REGRAS PURAS (servem ao jogo e à máquina)
+   --------------------------------------------------------- */
+
+function moinhoEm(tab, ponto, marca){
+  return MOINHOS.some(m => m.includes(ponto) && m.every(p => tab[p] === marca));
+}
+function estaEmMoinho(tab, ponto){
+  const m = tab[ponto];
+  return m !== null && MOINHOS.some(l => l.includes(ponto) && l.every(p => tab[p] === m));
+}
+function pecasDe(tab, marca){
+  const fora = [];
+  for(let i = 0; i < 24; i++) if(tab[i] === marca) fora.push(i);
+  return fora;
+}
+function removiveis(tab, alvo){
+  const todas = pecasDe(tab, alvo);
+  const soltas = todas.filter(p => !estaEmMoinho(tab, p));
+  return soltas.length ? soltas : todas;
+}
+function podeVoar(estado, marca){
+  return estado.naMao[marca] === 0 && pecasDe(estado.tab, marca).length === 3;
+}
+function movimentos(estado, marca){
+  const fora = [];
+  if(estado.naMao[marca] > 0){
+    for(let i = 0; i < 24; i++) if(estado.tab[i] === null) fora.push({para:i});
+    return fora;
+  }
+  const voa = podeVoar(estado, marca);
+  pecasDe(estado.tab, marca).forEach(de => {
+    const destinos = voa
+      ? [...Array(24).keys()].filter(i => estado.tab[i] === null)
+      : VIZINHOS[de].filter(i => estado.tab[i] === null);
+    destinos.forEach(para => fora.push({de, para}));
+  });
+  return fora;
+}
+function perdeu(estado, marca){
+  if(estado.naMao[marca] === 0 && pecasDe(estado.tab, marca).length < 3) return true;
+  if(estado.naMao[marca] === 0 && movimentos(estado, marca).length === 0) return true;
+  return false;
+}
+
+/* ---------------------------------------------------------
+   PREPARO
+   --------------------------------------------------------- */
+
+function montarPreparo(){
+  UI.escolhas($("#escModo"),
+    [{valor:"maquina", rotulo:"Contra a máquina"}, {valor:"dupla", rotulo:"Dois no aparelho"}],
+    cfg.modo, v => {
+      cfg.modo = v;
+      cfg.jogadores[1].tipo = (v === "maquina") ? "maquina" : "humano";
+      if(v === "maquina" && cfg.jogadores[1].nome === "Jogador 2") cfg.jogadores[1].nome = "Máquina";
+      if(v === "dupla"   && cfg.jogadores[1].nome === "Máquina")   cfg.jogadores[1].nome = "Jogador 2";
+      montarPreparo();
+    });
+
+  const lista = $("#listaJogadores");
+  lista.innerHTML = "";
+  cfg.jogadores.forEach(j => {
+    const linha = document.createElement("div");
+    linha.className = "jogador-linha";
+    const bola = document.createElement("span");
+    bola.className = "bolinha";
+    bola.style.background = j.marca === "X" ? "var(--carmim-claro)" : "var(--gold)";
+    const nome = document.createElement("input");
+    nome.type = "text"; nome.value = j.nome; nome.maxLength = 16;
+    nome.setAttribute("aria-label", "Nome do jogador");
+    nome.addEventListener("input", () => { j.nome = nome.value.trim() || ("Jogador " + j.marca); });
+    const nivel = document.createElement("select");
+    nivel.setAttribute("aria-label", "Nível");
+    [[1,"Fácil"],[2,"Médio"],[3,"Difícil"]].forEach(([v,t]) => {
+      const o = document.createElement("option"); o.value = v; o.textContent = t;
+      if(v === j.nivel) o.selected = true; nivel.appendChild(o);
+    });
+    nivel.addEventListener("change", () => { j.nivel = Number(nivel.value); });
+    linha.append(bola, nome, nivel);
+    lista.appendChild(linha);
+  });
+}
+
+/* ---------------------------------------------------------
+   PARTIDA
+   --------------------------------------------------------- */
+
+function comecar(){
+  Banco.zerar();
+  jogo = {
+    tab: Array(24).fill(null),
+    naMao: {X:PECAS, O:PECAS},
+    vez: "X",
+    fase: "jogar",          // jogar | movendo | removendo | pensando | fim
+    selecionada: null,
+    ultimoMoinho: null,
+    semProgresso: 0
+  };
+  UI.trocarTela("telaJogo");
+  desenharTrilhos();
+  redesenhar();
+  seguirVez();
+}
+
+function jogadorDe(m){ return cfg.jogadores.find(j => j.marca === m); }
+function outra(m){ return m === "X" ? "O" : "X"; }
+
+function svgEl(tag, attrs){
+  const e = document.createElementNS("http://www.w3.org/2000/svg", tag);
+  for(const k in attrs) e.setAttribute(k, attrs[k]);
+  return e;
+}
+
+function desenharTrilhos(){
+  const g = $("#trilhos");
+  g.innerHTML = "";
+  [[0,6],[1,5],[2,4]].forEach(([a,b]) => {
+    g.appendChild(svgEl("rect", {class:"trilho", x:px(a), y:py(a),
+      width:px(b)-px(a), height:py(b)-py(a), rx:1}));
+  });
+  [[50,5,50,35],[50,65,50,95],[5,50,35,50],[65,50,95,50]].forEach(([x1,y1,x2,y2]) => {
+    g.appendChild(svgEl("line", {class:"trilho", x1, y1, x2, y2}));
+  });
+}
+
+function redesenhar(){
+  const gp = $("#pontos"), gc = $("#pecas");
+  gp.innerHTML = ""; gc.innerHTML = "";
+
+  const meuTurno = jogo.fase !== "fim" && jogadorDe(jogo.vez).tipo === "humano";
+  const movs = meuTurno && jogo.fase === "jogar" ? movimentos(jogo, jogo.vez) : [];
+  const destinos = jogo.selecionada !== null
+    ? movs.filter(m => m.de === jogo.selecionada).map(m => m.para)
+    : (jogo.naMao[jogo.vez] > 0 ? movs.map(m => m.para) : []);
+  const removeAgora = jogo.fase === "removendo" && meuTurno
+    ? removiveis(jogo.tab, outra(jogo.vez)) : [];
+
+  for(let i = 0; i < 24; i++){
+    if(jogo.tab[i] === null){
+      const alvo = destinos.includes(i);
+      const c = svgEl("circle", {
+        class: "ponto" + (alvo ? " destino" : ""),
+        cx:X(i), cy:Y(i), r: alvo ? 4.6 : 3
+      });
+      if(alvo){
+        c.setAttribute("role","button");
+        c.setAttribute("aria-label","Ponto " + (i+1));
+        c.addEventListener("click", () => tocarPonto(i));
+      }
+      gp.appendChild(c);
+    } else {
+      const podeMover = meuTurno && jogo.fase === "jogar" && jogo.tab[i] === jogo.vez
+                        && jogo.naMao[jogo.vez] === 0
+                        && movs.some(m => m.de === i);
+      const podeRemover = removeAgora.includes(i);
+      const p = svgEl("circle", {
+        class: "peca " + (jogo.tab[i] === "X" ? "x" : "o")
+               + (podeMover ? " escolhivel" : "")
+               + (podeRemover ? " removivel" : "")
+               + (jogo.selecionada === i ? " selecionada" : ""),
+        cx:X(i), cy:Y(i), r:5.4
+      });
+      if(podeMover || podeRemover){
+        p.setAttribute("role","button");
+        p.addEventListener("click", () => tocarPonto(i));
+      }
+      gc.appendChild(p);
+    }
+  }
+  marcarMoinho();
+  atualizarPlacar();
+}
+
+function marcarMoinho(){
+  const g = $("#marcas");
+  g.innerHTML = "";
+  if(!jogo.ultimoMoinho) return;
+  const m = jogo.ultimoMoinho;
+  g.appendChild(svgEl("line", {class:"moinho",
+    x1:X(m[0]), y1:Y(m[0]), x2:X(m[2]), y2:Y(m[2])}));
+}
+
+function atualizarPlacar(){
+  ["X","O"].forEach(marca => {
+    const lado = $(marca === "X" ? "#ladoX" : "#ladoO");
+    lado.style.setProperty("--cor-lado", marca === "X" ? "var(--carmim-claro)" : "var(--gold-soft)");
+    $(".quem", lado).textContent = jogadorDe(marca).nome;
+    const est = $(".estoque", lado);
+    est.innerHTML = "";
+    for(let k = 0; k < PECAS; k++){
+      const i = document.createElement("i");
+      if(k >= jogo.naMao[marca]) i.className = "usada";
+      est.appendChild(i);
+    }
+    const noTab = pecasDe(jogo.tab, marca).length;
+    $(".contas", lado).textContent = noTab + " no tabuleiro"
+      + (jogo.naMao[marca] ? " · " + jogo.naMao[marca] + " na mão" : "")
+      + (podeVoar(jogo, marca) ? " · voando" : "");
+    lado.classList.toggle("vez", jogo.vez === marca && jogo.fase !== "fim");
+  });
+  $("#meioPlacar").innerHTML = jogo.naMao.X || jogo.naMao.O ? "fase de<br>colocar" : "fase de<br>mover";
+}
+
+function avisar(t){ $("#aviso").textContent = t || ""; }
+
+/* ---------- vez ---------- */
+
+function seguirVez(){
+  const j = jogadorDe(jogo.vez);
+  jogo.selecionada = null;
+  jogo.fase = "jogar";
+  redesenhar();
+
+  if(perdeu(jogo, jogo.vez)) return fimDaPartida(outra(jogo.vez),
+    pecasDe(jogo.tab, jogo.vez).length < 3 ? "ficou com menos de três peças" : "ficou sem movimento");
+
+  if(j.tipo === "maquina"){
+    jogo.fase = "pensando";
+    redesenhar();
+    avisar(j.nome + " está pensando…");
+    setTimeout(jogadaDaMaquina, 700);
+  } else {
+    avisar(jogo.naMao[jogo.vez] > 0
+      ? j.nome + ", coloque uma peça."
+      : j.nome + ", escolha uma peça para mover.");
+  }
+}
+
+function tocarPonto(i){
+  if(jogadorDe(jogo.vez).tipo !== "humano") return;
+
+  if(jogo.fase === "removendo"){
+    if(!removiveis(jogo.tab, outra(jogo.vez)).includes(i)) return;
+    jogo.tab[i] = null;
+    jogo.semProgresso = 0;
+    Som.comeu();
+    avisar("Peça retirada.");
+    jogo.ultimoMoinho = null;
+    return setTimeout(trocarVez, 700);
+  }
+
+  if(jogo.fase !== "jogar") return;
+
+  if(jogo.naMao[jogo.vez] > 0){
+    if(jogo.tab[i] !== null) return;
+    return executar({para:i});
+  }
+
+  if(jogo.tab[i] === jogo.vez){
+    jogo.selecionada = (jogo.selecionada === i) ? null : i;
+    Som.toque();
+    return redesenhar();
+  }
+  if(jogo.selecionada !== null && jogo.tab[i] === null){
+    const legal = movimentos(jogo, jogo.vez).some(m => m.de === jogo.selecionada && m.para === i);
+    if(legal) return executar({de:jogo.selecionada, para:i});
+  }
+}
+
+function executar(mov){
+  const marca = jogo.vez;
+  if(mov.de !== undefined){ jogo.tab[mov.de] = null; jogo.semProgresso++; }
+  else { jogo.naMao[marca]--; jogo.semProgresso = 0; }
+  jogo.tab[mov.para] = marca;
+  jogo.selecionada = null;
+  Som.marcar();
+
+  const fez = MOINHOS.find(m => m.includes(mov.para) && m.every(p => jogo.tab[p] === marca));
+  jogo.ultimoMoinho = fez || null;
+  redesenhar();
+
+  if(!fez) return setTimeout(trocarVez, 550);
+
+  Som.chegou();
+  const j = jogadorDe(marca);
+  avisar(j.nome + " fez um moinho!");
+
+  if(j.tipo === "maquina"){
+    const acertou = Math.random() < ACERTO_MAQUINA[j.nivel];
+    return setTimeout(() => {
+      if(!acertou){
+        Som.erro();
+        avisar(j.nome + " fez o moinho mas errou a pergunta.");
+        jogo.ultimoMoinho = null; redesenhar();
+        return setTimeout(trocarVez, 900);
+      }
+      Som.acerto();
+      const alvos = removiveis(jogo.tab, outra(marca));
+      const escolha = melhorRemocao(jogo.tab, alvos, outra(marca));
+      jogo.tab[escolha] = null;
+      jogo.semProgresso = 0;
+      jogo.ultimoMoinho = null;
+      avisar(j.nome + " acertou a pergunta e tirou uma peça sua.");
+      Som.comeu();
+      redesenhar();
+      setTimeout(trocarVez, 900);
+    }, 800);
+  }
+
+  setTimeout(() => {
+    Pergunta.abrir({
+      para: j.nome,
+      nivel: j.nivel,
+      texto: a => a ? "Certa. Escolha a peça do adversário que vai sair."
+                    : "Errada. O moinho não rende nada desta vez.",
+      aoResponder: (acertou) => {
+        if(!acertou){
+          jogo.ultimoMoinho = null;
+          redesenhar();
+          avisar("O moinho não rendeu nada.");
+          return setTimeout(trocarVez, 700);
+        }
+        jogo.fase = "removendo";
+        redesenhar();
+        avisar("Toque na peça do adversário que vai sair.");
+      }
+    });
+  }, 650);
+}
+
+function trocarVez(){
+  if(jogo.fase === "fim") return;
+  jogo.ultimoMoinho = null;
+  if(jogo.semProgresso >= LANCES_SEM_PROGRESSO)
+    return fimDaPartida(null, "quarenta lances sem nenhuma peça sair do tabuleiro");
+  jogo.vez = outra(jogo.vez);
+  seguirVez();
+}
+
+/* ---------------------------------------------------------
+   A MÁQUINA
+   --------------------------------------------------------- */
+
+function melhorRemocao(tab, alvos, alvoMarca){
+  // tira a peça que mais ameaça virar moinho
+  let melhor = alvos[0], nota = -Infinity;
+  alvos.forEach(p => {
+    let n = VIZINHOS[p].length;                       // peça bem conectada vale mais
+    MOINHOS.forEach(m => {
+      if(!m.includes(p)) return;
+      const dela = m.filter(q => tab[q] === alvoMarca).length;
+      const vazios = m.filter(q => tab[q] === null).length;
+      if(dela === 2 && vazios === 1) n += 12;         // estava a um passo de fechar
+    });
+    if(n > nota){ nota = n; melhor = p; }
+  });
+  return melhor;
+}
+
+function clonar(estado){
+  return { tab: estado.tab.slice(), naMao: {X:estado.naMao.X, O:estado.naMao.O} };
+}
+
+/* aplica um movimento e já resolve a remoção pela heurística */
+function aplicar(estado, marca, mov, acertaPergunta){
+  const novo = clonar(estado);
+  if(mov.de !== undefined) novo.tab[mov.de] = null;
+  else novo.naMao[marca]--;
+  novo.tab[mov.para] = marca;
+  const fez = MOINHOS.some(m => m.includes(mov.para) && m.every(p => novo.tab[p] === marca));
+  if(fez && acertaPergunta){
+    const alvos = removiveis(novo.tab, outra(marca));
+    if(alvos.length) novo.tab[melhorRemocao(novo.tab, alvos, outra(marca))] = null;
+  }
+  return novo;
+}
+
+function avaliar(estado, eu){
+  const ele = outra(eu);
+  const meus = pecasDe(estado.tab, eu).length + estado.naMao[eu];
+  const dele = pecasDe(estado.tab, ele).length + estado.naMao[ele];
+  let nota = (meus - dele) * 20;
+
+  MOINHOS.forEach(m => {
+    const a = m.filter(p => estado.tab[p] === eu).length;
+    const b = m.filter(p => estado.tab[p] === ele).length;
+    const v = m.filter(p => estado.tab[p] === null).length;
+    if(a === 3) nota += 18;
+    else if(a === 2 && v === 1) nota += 7;
+    if(b === 3) nota -= 20;
+    else if(b === 2 && v === 1) nota -= 9;
+  });
+
+  nota += (movimentos(estado, eu).length - movimentos(estado, ele).length) * 0.7;
+  for(let i = 0; i < 24; i++)
+    if(estado.tab[i] === eu) nota += VIZINHOS[i].length * 0.6;
+  return nota;
+}
+
+function buscar(estado, prof, alfa, beta, daVez, eu){
+  if(pecasDe(estado.tab, "X").length < 3 && estado.naMao.X === 0)
+    return eu === "O" ? 9000 - prof : -9000 + prof;
+  if(pecasDe(estado.tab, "O").length < 3 && estado.naMao.O === 0)
+    return eu === "X" ? 9000 - prof : -9000 + prof;
+  if(prof === 0) return avaliar(estado, eu);
+
+  const movs = movimentos(estado, daVez);
+  if(movs.length === 0) return daVez === eu ? -9000 + prof : 9000 - prof;
+
+  const maximiza = daVez === eu;
+  let melhor = maximiza ? -Infinity : Infinity;
+  for(const mov of movs){
+    const filho = aplicar(estado, daVez, mov, true);
+    const n = buscar(filho, prof - 1, alfa, beta, outra(daVez), eu);
+    if(maximiza){ melhor = Math.max(melhor, n); alfa = Math.max(alfa, melhor); }
+    else        { melhor = Math.min(melhor, n); beta  = Math.min(beta,  melhor); }
+    if(alfa >= beta) break;
+  }
+  return melhor;
+}
+
+const PROFUNDIDADE = {1:0, 2:2, 3:3};
+
+function jogadaDaMaquina(){
+  const j = jogadorDe(jogo.vez);
+  const movs = movimentos(jogo, jogo.vez);
+  if(movs.length === 0) return seguirVez();
+
+  let escolha;
+  if(j.nivel === 1 && Math.random() < 0.55){
+    escolha = movs[Math.floor(Math.random() * movs.length)];
+  } else {
+    const prof = PROFUNDIDADE[j.nivel];
+    let melhor = -Infinity;
+    escolha = movs[0];
+    for(const mov of movs){
+      const filho = aplicar(jogo, jogo.vez, mov, true);
+      const n = prof === 0
+        ? avaliar(filho, jogo.vez)
+        : buscar(filho, prof, -Infinity, Infinity, outra(jogo.vez), jogo.vez);
+      if(n > melhor){ melhor = n; escolha = mov; }
+    }
+  }
+  jogo.fase = "jogar";
+  executar(escolha);
+}
+
+/* ---------------------------------------------------------
+   FIM
+   --------------------------------------------------------- */
+
+function fimDaPartida(marca, motivo){
+  jogo.fase = "fim";
+  if(marca === null){
+    Som.empate();
+    $("#fimTitulo").textContent = "Empate";
+    $("#fimSub").textContent = "A partida travou: " + motivo + ".";
+  } else {
+    Som.vitoria();
+    $("#fimTitulo").textContent = jogadorDe(marca).nome + " venceu";
+    $("#fimSub").textContent = jogadorDe(outra(marca)).nome + " " + motivo + ".";
+  }
+  UI.trocarTela("telaFim");
+}
+
+/* ---------------------------------------------------------
+   LIGAÇÕES
+   --------------------------------------------------------- */
+
+UI.iniciar({ titulo:"Moinho", versao:VERSAO, regras:REGRAS, voltar:"index.html" });
+
+$("#btnComecar").addEventListener("click", comecar);
+$("#btnSair").addEventListener("click", () => UI.trocarTela("telaPreparo"));
+$("#btnDeNovo").addEventListener("click", comecar);
+$("#btnVoltarPreparo").addEventListener("click", () => UI.trocarTela("telaPreparo"));
+
+montarPreparo();
+</script>
+</body>
+</html>
