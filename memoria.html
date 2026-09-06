@@ -63,7 +63,11 @@
 .face{
   position:absolute;top:0;right:0;bottom:0;left:0;border-radius:9px;
   -webkit-backface-visibility:hidden;backface-visibility:hidden;
-  display:grid;place-items:center;padding:6px;overflow:hidden;
+  display:grid;place-items:center;padding:5px;overflow:hidden;
+}
+.txt{
+  display:block;width:100%;max-height:100%;
+  line-height:1.14;overflow-wrap:anywhere;hyphens:auto;
 }
 .verso{
   background:var(--surface);border:1px solid var(--gold);
@@ -77,24 +81,16 @@
 .carta:not([aria-disabled="true"]):hover .verso{background:var(--surface-2)}
 .frente{
   background:var(--surface-2);border:1px solid var(--linha);
-  transform:rotateY(180deg);
-  text-align:center;line-height:1.18;hyphens:auto;overflow-wrap:anywhere;
+  transform:rotateY(180deg);text-align:center;
 }
 .frente.pergunta{color:var(--ink)}
 .frente.resposta{color:var(--gold-soft);font-family:'Cinzel',serif}
-.t1{font-size:17px}
-.t2{font-size:14.5px}
-.t3{font-size:12.5px}
+/* Tamanhos de reserva. O valor de verdade é calculado por medição
+   em ajustarTexto(), que faz a letra crescer até encostar nas bordas. */
+.t1{font-size:19px}
+.t2{font-size:16px}
+.t3{font-size:13px}
 .t4{font-size:11px}
-.mesa.c4 .t1{font-size:15px}
-.mesa.c4 .t2{font-size:13px}
-.mesa.c4 .t3{font-size:11px}
-.mesa.c4 .t4{font-size:9.5px}
-@media (max-width:360px){
-  .t1{font-size:15px} .t2{font-size:13px} .t3{font-size:11px} .t4{font-size:10px}
-  .mesa.c4 .t1{font-size:13px} .mesa.c4 .t2{font-size:11.5px}
-  .mesa.c4 .t3{font-size:10px} .mesa.c4 .t4{font-size:9px}
-}
 
 .carta.achada .frente{
   border-color:var(--esmeralda);
@@ -179,7 +175,7 @@
    v1.0.0
    ========================================================= */
 
-const VERSAO = "1.1.1";
+const VERSAO = "1.2.0";
 
 /* Mesa maior exige pergunta mais curta, senão o texto não cabe na carta. */
 const MESAS = {
@@ -421,8 +417,11 @@ function montarMesa(colunas){
     verso.appendChild(document.createElement("i"));
 
     const frente = document.createElement("span");
-    frente.className = "face frente " + (c.tipo === "p" ? "pergunta " : "resposta ") + classeTexto(c.texto);
-    frente.textContent = c.texto;
+    frente.className = "face frente " + (c.tipo === "p" ? "pergunta " : "resposta ");
+    const txt = document.createElement("span");
+    txt.className = "txt " + classeTexto(c.texto);
+    txt.textContent = c.texto;
+    frente.appendChild(txt);
 
     folha.append(verso, frente);
     b.appendChild(folha);
@@ -432,7 +431,39 @@ function montarMesa(colunas){
     });
     mesa.appendChild(b);
   });
+  ajustarTodos();
 }
+
+/* Faz a letra de cada carta crescer até o texto encostar nas bordas.
+   É busca binária sobre o tamanho da fonte: bem mais confiável do que
+   adivinhar quantas letras cabem, porque leva em conta a fonte de verdade,
+   a largura real da carta e o tamanho da tela. */
+function ajustarTexto(frente){
+  const txt = $(".txt", frente);
+  if(!txt) return;
+  const alturaUtil = frente.clientHeight - 10;
+  const larguraUtil = frente.clientWidth - 10;
+  if(alturaUtil <= 0 || larguraUtil <= 0) return;   // ainda sem layout: fica o tamanho de reserva
+
+  let menor = 7, maior = 26;
+  for(let i = 0; i < 8; i++){
+    const meio = (menor + maior) / 2;
+    txt.style.fontSize = meio + "px";
+    const cabe = txt.scrollHeight <= alturaUtil && txt.scrollWidth <= larguraUtil + 1;
+    if(cabe) menor = meio; else maior = meio;
+  }
+  txt.style.fontSize = menor.toFixed(1) + "px";
+}
+
+function ajustarTodos(){
+  $$("#mesa .frente").forEach(ajustarTexto);
+}
+
+let releitura = null;
+window.addEventListener("resize", () => {
+  clearTimeout(releitura);
+  releitura = setTimeout(() => { if(jogo) ajustarTodos(); }, 180);
+});
 
 function montarFaixa(){
   const f = $("#faixa");
