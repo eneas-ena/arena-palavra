@@ -185,7 +185,7 @@
    v1.0.0
    ========================================================= */
 
-const VERSAO = "1.0.1";
+const VERSAO = "1.0.2";
 const VIDAS = 6;
 
 const REGRAS = `
@@ -319,7 +319,6 @@ function comecar(){
   cfg.jogadores.forEach(j => j.pontos = 0);
   jogo = { rodada:1, vez:0, comeca:0 };
   UI.trocarTela("telaJogo");
-  montarTeclado();
   novaPalavra();
 }
 
@@ -403,7 +402,7 @@ function montarTeclado(){
     const b = document.createElement("button");
     b.className = "tecla";
     b.textContent = L;
-    if(jogo && jogo.tentadas.has(L)){
+    if(jogo && jogo.tentadas && jogo.tentadas.has(L)){
       b.disabled = true;
       b.classList.add(jogo.chave.includes(L) ? "certa" : "errada");
     }
@@ -418,7 +417,7 @@ function avisar(t){ $("#aviso").textContent = t || ""; }
 /* ---------- as jogadas ---------- */
 
 function tentarLetra(L){
-  if(!jogo || jogo.fim || jogo.tentadas.has(L)) return;
+  if(!jogo || !jogo.item || jogo.fim || jogo.tentadas.has(L)) return;
   jogo.tentadas.add(L);
 
   if(jogo.chave.includes(L)){
@@ -475,7 +474,7 @@ function errar(mensagem){
 }
 
 function pedirLetra(){
-  if(!jogo || jogo.fim) return;
+  if(!jogo || !jogo.item || jogo.fim) return;
   $("#btnLetra").disabled = true;
   Pergunta.abrir({
     para: atual().nome,
@@ -495,7 +494,7 @@ function pedirLetra(){
 }
 
 function verPergunta(){
-  if(!jogo || jogo.fim || jogo.pistaUsada) return;
+  if(!jogo || !jogo.item || jogo.fim || jogo.pistaUsada) return;
   jogo.pistaUsada = true;
   $("#btnPista").disabled = true;
   $("#revelada").textContent = jogo.item.pergunta;
@@ -593,7 +592,7 @@ $("#btnDeNovo").addEventListener("click", comecar);
 $("#btnVoltarPreparo").addEventListener("click", () => UI.trocarTela("telaPreparo"));
 
 document.addEventListener("keydown", e => {
-  if(!jogo || jogo.fim) return;
+  if(!jogo || !jogo.item || jogo.fim) return;
   if($("#cortinaPergunta").classList.contains("ativa")) return;
   const L = semAcento(e.key);
   if(L.length === 1 && ALFABETO.includes(L)) tentarLetra(L);
