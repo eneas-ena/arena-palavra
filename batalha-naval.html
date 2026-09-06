@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0F1B33">
+<title>Batalha Naval — Arena da Palavra</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="32x32" href="icone-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icone-192.png">
+<link rel="apple-touch-icon" href="icone-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Arena da Palavra">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="comum.css">
+<style>
+/* Espaçamentos em pixels, nunca em porcentagem no sentido vertical:
+   porcentagem se calcula sobre a altura do container, que só existe
+   depois de medir as casas — e a última fileira acaba vazando. */
+
+.rotulo-mar{
+  display:flex;align-items:baseline;gap:8px;margin:0 0 7px;
+  font-family:'Cinzel',serif;font-size:13px;color:var(--gold);
+}
+.rotulo-mar small{font-family:'Cormorant Garamond',serif;font-size:15px;color:var(--ink-dim)}
+
+.mar{
+  display:grid;grid-template-columns:repeat(7,1fr);
+  gap:4px;align-content:start;
+  background:var(--surface);border:1px solid var(--linha);
+  border-radius:10px;padding:6px;
+}
+.mar.meu{gap:3px;padding:5px;max-width:230px}
+.casa{
+  width:100%;aspect-ratio:1;border-radius:5px;padding:0;border:none;
+  background:var(--surface-2);display:grid;place-items:center;
+  font-size:15px;line-height:1;color:var(--ink-dim);
+  -webkit-tap-highlight-color:transparent;transition:background .15s;
+}
+.casa.aberta:hover,.casa.aberta:focus-visible{background:rgba(201,162,39,.22)}
+.casa:disabled{cursor:default}
+.casa.alvo{box-shadow:0 0 0 2px var(--gold)}
+.casa.agua{background:var(--bg);color:var(--ink-dim);opacity:.65}
+.casa.acerto{background:var(--carmim);color:#F2EDE1}
+.casa.afundado{background:var(--carmim-claro);color:#0A1425}
+.casa.navio{background:var(--gold);opacity:.55}
+.casa.navio.atingido{background:var(--carmim);opacity:1;color:#F2EDE1}
+
+.frotas{
+  display:flex;gap:9px;flex-wrap:wrap;margin:12px 0 4px;
+}
+.barco{
+  display:flex;align-items:center;gap:6px;font-size:14px;
+  padding:5px 9px;border-radius:7px;border:1px solid var(--linha);background:var(--surface);
+}
+.barco .casco{display:flex;gap:2px}
+.barco .casco i{width:7px;height:12px;border-radius:2px;background:var(--gold);display:block}
+.barco.afundado{opacity:.4;text-decoration:line-through}
+.barco.afundado .casco i{background:var(--carmim-claro)}
+
+.dupla{display:grid;gap:16px;margin-bottom:6px}
+.linha-info{
+  display:flex;align-items:center;gap:10px;margin-bottom:12px;
+  padding:10px 12px;border-radius:9px;background:var(--surface);
+  border:1px solid var(--linha);border-left:5px solid var(--vez-cor,var(--gold));
+}
+.linha-info .quem{flex:1;min-width:0}
+.linha-info .nome{font-family:'Cinzel',serif;font-size:15px;display:block}
+.linha-info .sub{font-size:15px;color:var(--ink-dim)}
+.linha-info .contagem{font-size:15px;color:var(--ink-dim);text-align:right;flex-shrink:0;line-height:1.25}
+
+.desfecho{text-align:center;margin-top:14px}
+.desfecho .frase{font-family:'Cinzel',serif;font-size:19px;margin:0 0 10px}
+.desfecho .frase.venceu{color:var(--gold)}
+</style>
+</head>
+<body>
+
+<header></header>
+
+<main>
+
+<!-- ============ PREPARO ============ -->
+<section class="tela ativa" id="telaPreparo">
+  <div class="bloco">
+    <h2>Quem joga</h2>
+    <div id="listaJogadores"></div>
+  </div>
+
+  <div class="bloco">
+    <h2>A frota</h2>
+    <p class="legenda" style="margin:0">Mar de 7 por 7. Quatro navios de cada lado: um de quatro casas, um de três e dois de duas.</p>
+  </div>
+
+  <button class="principal" id="btnPosicionar">Posicionar a frota</button>
+</section>
+
+<!-- ============ POSICIONAR ============ -->
+<section class="tela" id="telaPosicionar">
+  <p class="legenda">Esta é a sua frota. Se não gostou da disposição, sorteie outra.</p>
+  <div class="mar meu" id="marPreview" style="max-width:280px;margin:0 auto"></div>
+  <div class="frotas" id="frotaPreview" style="justify-content:center"></div>
+  <button class="principal" id="btnZarpar" style="margin-top:16px">Zarpar</button>
+  <button class="secundario" id="btnSortear">Sortear outra disposição</button>
+</section>
+
+<!-- ============ JOGO ============ -->
+<section class="tela" id="telaJogo">
+  <div class="linha-info" id="linhaInfo">
+    <span class="bolinha" id="infoBolinha"></span>
+    <span class="quem">
+      <span class="nome" id="infoNome">—</span>
+      <span class="sub" id="infoSub">—</span>
+    </span>
+    <span class="contagem" id="infoContagem">—</span>
+  </div>
+
+  <div class="dupla">
+    <div>
+      <p class="rotulo-mar">MAR INIMIGO <small>toque para mirar</small></p>
+      <div class="mar" id="marInimigo"></div>
+      <div class="frotas" id="frotaInimiga"></div>
+    </div>
+    <div>
+      <p class="rotulo-mar">SUA FROTA</p>
+      <div class="mar meu" id="marProprio"></div>
+      <div class="frotas" id="frotaPropria"></div>
+    </div>
+  </div>
+
+  <p class="aviso" id="aviso">—</p>
+  <div class="desfecho" id="desfecho"></div>
+  <button class="secundario" id="btnSair">Encerrar e voltar</button>
+</section>
+
+<!-- ============ FIM ============ -->
+<section class="tela" id="telaFim">
+  <div class="fim">
+    <h2 id="fimTitulo">—</h2>
+    <p class="legenda" id="fimSub">—</p>
+    <button class="principal" id="btnDeNovo">Jogar de novo</button>
+    <button class="secundario" id="btnVoltarPreparo">Mudar as opções</button>
+  </div>
+</section>
+
+</main>
+
+<script src="perguntas.js"></script>
+<script src="comum.js"></script>
+<script>
+"use strict";
+
+/* =========================================================
+   BATALHA NAVAL — Arena da Palavra
+   Mire numa casa, responda a pergunta, e só então o tiro sai.
+   Acertou navio, atira de novo. Caiu na água, a vez passa.
+   v1.0.0
+   ========================================================= */
+
+const VERSAO = "1.0.1";
+const N = 7;
+const NAVIOS = [
+  {nome:"Porta-aviões", tam:4},
+  {nome:"Cruzador",     tam:3},
+  {nome:"Submarino",    tam:2},
+  {nome:"Patrulha",     tam:2}
+];
+const CASAS_COM_NAVIO = NAVIOS.reduce((a,b) => a + b.tam, 0);
+
+const REGRAS = `
+  <h2>Como se joga</h2>
+
+  <h3>O objetivo</h3>
+  <p>Afundar os quatro navios da máquina antes que ela afunde os seus. São 11 casas com navio em cada mar de 49.</p>
+
+  <h3>A jogada</h3>
+  <p>Toque numa casa do mar inimigo para mirar. A pergunta bíblica vem depois. Acertando a pergunta, o tiro sai; errando, o tiro não acontece e a vez passa.</p>
+
+  <h3>Tiro certeiro dá outro tiro</h3>
+  <p>Se o tiro atingir um navio, você joga de novo — e responde outra pergunta. Uma sequência de acertos pode afundar um navio inteiro num único turno.</p>
+
+  <h3>Os dois mares</h3>
+  <p>Em cima fica o mar inimigo, onde você atira. Embaixo, a sua frota, onde aparecem os tiros da máquina. Ponto escuro é água; casa vermelha é navio atingido.</p>
+
+  <h3>Os níveis</h3>
+  <p>O nível muda a dificuldade das suas perguntas e o comportamento da máquina. No fácil ela atira sempre a esmo, mesmo depois de acertar. No médio e no difícil, um acerto faz ela perseguir o navio pelas casas vizinhas até afundá-lo — e ela também erra menos perguntas.</p>
+
+  <h3>Por que aqui não tem dois no mesmo aparelho</h3>
+  <p>Batalha naval depende de cada um não ver o mar do outro. Num aparelho só isso não existe. Quando a Arena passar a ligar dois celulares, este é o jogo que mais vai ganhar com isso.</p>
+`;
+
+let cfg = { nome:"Você", nivel:2 };
+let jogo = null;
+let previewMar = null;
+
+const lin = p => Math.floor(p / N);
+const col = p => p % N;
+
+/* ---------------------------------------------------------
+   POSICIONAR A FROTA
+   --------------------------------------------------------- */
+
+function sortearMar(){
+  for(let tentativa = 0; tentativa < 200; tentativa++){
+    const mar = Array(N*N).fill(null);
+    let deuCerto = true;
+
+    for(let id = 0; id < NAVIOS.length; id++){
+      const tam = NAVIOS[id].tam;
+      let posto = false;
+      for(let t = 0; t < 400 && !posto; t++){
+        const horiz = Math.random() < 0.5;
+        const l = Math.floor(Math.random() * (horiz ? N : N - tam + 1));
+        const c = Math.floor(Math.random() * (horiz ? N - tam + 1 : N));
+        const casas = [];
+        let livre = true;
+        for(let k = 0; k < tam; k++){
+          const p = (l + (horiz ? 0 : k)) * N + (c + (horiz ? k : 0));
+          if(mar[p] !== null){ livre = false; break; }
+          casas.push(p);
+        }
+        if(livre){ casas.forEach(p => mar[p] = id); posto = true; }
+      }
+      if(!posto){ deuCerto = false; break; }
+    }
+    if(deuCerto) return mar;
+  }
+  return Array(N*N).fill(null);
+}
+
+function desenharMar(container, mar, tiros, mostrarNavios, aoClicar){
+  container.innerHTML = "";
+  for(let p = 0; p < N*N; p++){
+    const casa = document.createElement(aoClicar ? "button" : "span");
+    casa.className = "casa";
+    casa.dataset.p = p;
+    const t = tiros ? tiros[p] : null;
+
+    if(mostrarNavios && mar[p] !== null) casa.classList.add("navio");
+
+    if(t === "agua"){ casa.classList.add("agua"); casa.textContent = "·"; }
+    else if(t === "acerto"){
+      const afundou = navioAfundado(mar, tiros, mar[p]);
+      casa.classList.add(mostrarNavios ? "atingido" : (afundou ? "afundado" : "acerto"));
+      casa.textContent = afundou ? "✖" : "✷";
+    }
+
+    if(aoClicar){
+      const podeAtirar = !t;
+      casa.disabled = !podeAtirar;
+      casa.classList.toggle("aberta", podeAtirar);
+      casa.setAttribute("aria-label",
+        "Casa " + String.fromCharCode(65 + col(p)) + (lin(p) + 1) +
+        (t ? (t === "agua" ? ", água" : ", acertada") : ""));
+      casa.addEventListener("click", () => aoClicar(p));
+    }
+    container.appendChild(casa);
+  }
+}
+
+function navioAfundado(mar, tiros, id){
+  if(id === null || id === undefined) return false;
+  for(let p = 0; p < N*N; p++)
+    if(mar[p] === id && tiros[p] !== "acerto") return false;
+  return true;
+}
+
+function desenharFrota(container, mar, tiros){
+  container.innerHTML = "";
+  NAVIOS.forEach((nv, id) => {
+    const b = document.createElement("span");
+    b.className = "barco" + (tiros && navioAfundado(mar, tiros, id) ? " afundado" : "");
+    const casco = document.createElement("span");
+    casco.className = "casco";
+    for(let k = 0; k < nv.tam; k++) casco.appendChild(document.createElement("i"));
+    const nome = document.createElement("span");
+    nome.textContent = nv.nome;
+    b.append(casco, nome);
+    container.appendChild(b);
+  });
+}
+
+/* ---------------------------------------------------------
+   PREPARO
+   --------------------------------------------------------- */
+
+function montarPreparo(){
+  const lista = $("#listaJogadores");
+  lista.innerHTML = "";
+  const linha = document.createElement("div");
+  linha.className = "jogador-linha";
+
+  const bola = document.createElement("span");
+  bola.className = "bolinha"; bola.style.background = "var(--gold)";
+
+  const nome = document.createElement("input");
+  nome.type = "text"; nome.value = cfg.nome; nome.maxLength = 16;
+  nome.setAttribute("aria-label", "Seu nome");
+  nome.addEventListener("input", () => { cfg.nome = nome.value.trim() || "Você"; });
+
+  const nivel = document.createElement("select");
+  nivel.setAttribute("aria-label", "Nível");
+  [[1,"Fácil"],[2,"Médio"],[3,"Difícil"]].forEach(([v,t]) => {
+    const o = document.createElement("option"); o.value = v; o.textContent = t;
+    if(v === cfg.nivel) o.selected = true; nivel.appendChild(o);
+  });
+  nivel.addEventListener("change", () => { cfg.nivel = Number(nivel.value); });
+
+  linha.append(bola, nome, nivel);
+  lista.appendChild(linha);
+}
+
+function abrirPosicionamento(){
+  previewMar = sortearMar();
+  desenharMar($("#marPreview"), previewMar, null, true, null);
+  desenharFrota($("#frotaPreview"), previewMar, null);
+  UI.trocarTela("telaPosicionar");
+}
+
+/* ---------------------------------------------------------
+   PARTIDA
+   --------------------------------------------------------- */
+
+function zarpar(){
+  Banco.zerar();
+  jogo = {
+    meuMar: previewMar,
+    marDela: sortearMar(),
+    tirosDela: Array(N*N).fill(null),   // tiros da máquina no meu mar
+    meusTiros: Array(N*N).fill(null),   // meus tiros no mar dela
+    vez: "eu",
+    fase: "mirar",
+    pendente: null,
+    fila: [],                            // casas que a máquina quer investigar
+    ultimoAcerto: null
+  };
+  UI.trocarTela("telaJogo");
+  $("#desfecho").innerHTML = "";
+  redesenhar();
+  Som.chegou();
+  avisar(cfg.nome + ", escolha onde atirar.");
+}
+
+function redesenhar(){
+  desenharMar($("#marInimigo"), jogo.marDela, jogo.meusTiros, false,
+              jogo.vez === "eu" && jogo.fase === "mirar" ? mirar : null);
+  desenharMar($("#marProprio"), jogo.meuMar, jogo.tirosDela, true, null);
+  desenharFrota($("#frotaInimiga"), jogo.marDela, jogo.meusTiros);
+  desenharFrota($("#frotaPropria"), jogo.meuMar, jogo.tirosDela);
+  atualizarLinha();
+}
+
+function contarAcertos(tiros){ return tiros.filter(t => t === "acerto").length; }
+
+function atualizarLinha(){
+  const meu = jogo.vez === "eu";
+  $("#linhaInfo").style.setProperty("--vez-cor", meu ? "var(--gold)" : "var(--carmim-claro)");
+  $("#infoBolinha").style.background = meu ? "var(--gold)" : "var(--carmim-claro)";
+  $("#infoNome").textContent = meu ? cfg.nome : "Máquina";
+  $("#infoSub").textContent = meu ? "sua vez de atirar" : "a máquina está atirando";
+  $("#infoContagem").innerHTML =
+    "você acertou " + contarAcertos(jogo.meusTiros) + " de " + CASAS_COM_NAVIO + "<br>" +
+    "ela acertou " + contarAcertos(jogo.tirosDela) + " de " + CASAS_COM_NAVIO;
+}
+
+function avisar(t){ $("#aviso").textContent = t || ""; }
+
+/* ---------- meu tiro ---------- */
+
+function mirar(p){
+  if(jogo.fase !== "mirar" || jogo.vez !== "eu") return;
+  if(jogo.meusTiros[p]) return;
+
+  jogo.fase = "respondendo";
+  jogo.pendente = p;
+  Som.toque();
+  const casa = $('#marInimigo .casa[data-p="' + p + '"]');
+  if(casa) casa.classList.add("alvo");
+
+  Pergunta.abrir({
+    para: cfg.nome,
+    nivel: cfg.nivel,
+    texto: a => a ? "Resposta certa. O tiro sai." : "Resposta errada. O tiro não sai e a vez passa.",
+    aoResponder: (acertou) => {
+      if(!acertou){
+        Som.erro();
+        avisar("A pergunta falhou. O tiro ficou no canhão.");
+        return passarVez();
+      }
+      atirar("eu", p);
+    }
+  });
+}
+
+function atirar(quem, p){
+  const mar   = quem === "eu" ? jogo.marDela   : jogo.meuMar;
+  const tiros = quem === "eu" ? jogo.meusTiros : jogo.tirosDela;
+  const acertou = mar[p] !== null;
+  tiros[p] = acertou ? "acerto" : "agua";
+
+  const nomeCasa = String.fromCharCode(65 + col(p)) + (lin(p) + 1);
+  const atirador = quem === "eu" ? cfg.nome : "A máquina";
+
+  if(acertou){
+    Som.marcar();
+    const afundou = navioAfundado(mar, tiros, mar[p]);
+    avisar(afundou
+      ? atirador + " afundou o " + NAVIOS[mar[p]].nome + " em " + nomeCasa + "!"
+      : atirador + " acertou um navio em " + nomeCasa + ".");
+    if(afundou) Som.chegou();
+    if(quem === "ele") registrarCacada(p, mar, tiros);
+  } else {
+    Som.toque();
+    avisar(atirador + " caiu na água em " + nomeCasa + ".");
+  }
+
+  jogo.fase = "parado";
+  redesenhar();
+
+  if(contarAcertos(tiros) >= CASAS_COM_NAVIO)
+    return setTimeout(() => fimDaPartida(quem), 1100);
+
+  if(acertou){
+    // quem acerta atira de novo
+    setTimeout(() => {
+      jogo.fase = "mirar";
+      if(quem === "eu"){ redesenhar(); avisar("Acertou: atire outra vez."); }
+      else vezDaMaquina();
+    }, 1100);
+  } else {
+    setTimeout(passarVez, 1100);
+  }
+}
+
+function passarVez(){
+  jogo.vez = jogo.vez === "eu" ? "ele" : "eu";
+  jogo.fase = "mirar";
+  redesenhar();
+  if(jogo.vez === "ele"){
+    avisar("A máquina está mirando…");
+    setTimeout(vezDaMaquina, 800);
+  } else {
+    avisar(cfg.nome + ", escolha onde atirar.");
+  }
+}
+
+/* ---------- a máquina ---------- */
+
+function registrarCacada(p, mar, tiros){
+  // no fácil ela não persegue: acerta e continua atirando a esmo
+  if(cfg.nivel === 1){
+    if(navioAfundado(mar, tiros, mar[p])) jogo.ultimoAcerto = null;
+    return;
+  }
+  // nos outros níveis, depois de acertar ela investiga as casas vizinhas
+  const vizinhas = [];
+  const l = lin(p), c = col(p);
+  [[l-1,c],[l+1,c],[l,c-1],[l,c+1]].forEach(([a,b]) => {
+    if(a >= 0 && a < N && b >= 0 && b < N){
+      const q = a*N + b;
+      if(!tiros[q]) vizinhas.push(q);
+    }
+  });
+
+  // se já tem dois acertos em linha, segue a linha e descarta o resto
+  if(jogo.ultimoAcerto !== null){
+    const dl = lin(p) - lin(jogo.ultimoAcerto), dc = col(p) - col(jogo.ultimoAcerto);
+    if(Math.abs(dl) + Math.abs(dc) === 1){
+      const emLinha = vizinhas.filter(q => (lin(q) - l) === dl || (col(q) - c) === dc
+                                        || (l - lin(q)) === dl || (c - col(q)) === dc);
+      if(emLinha.length) jogo.fila = emLinha.concat(jogo.fila.filter(x => emLinha.includes(x)));
+    }
+  }
+  jogo.fila = vizinhas.concat(jogo.fila);
+  if(navioAfundado(mar, tiros, mar[p])){ jogo.fila = []; jogo.ultimoAcerto = null; }
+  else jogo.ultimoAcerto = p;
+}
+
+function alvoDaMaquina(){
+  while(jogo.fila.length){
+    const p = jogo.fila.shift();
+    if(!jogo.tirosDela[p]) return p;
+  }
+  const livres = [];
+  const paridade = [];
+  for(let p = 0; p < N*N; p++){
+    if(jogo.tirosDela[p]) continue;
+    livres.push(p);
+    if((lin(p) + col(p)) % 2 === 0) paridade.push(p);
+  }
+  // no difícil ela varre em xadrez, que é a forma mais eficiente de procurar
+  const usarParidade = cfg.nivel === 3 || (cfg.nivel === 2 && Math.random() < 0.6);
+  const pool = (usarParidade && paridade.length) ? paridade : livres;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+function vezDaMaquina(){
+  if(jogo.vez !== "ele") return;
+  const p = alvoDaMaquina();
+  const acertouPergunta = Math.random() < ACERTO_MAQUINA[cfg.nivel];
+  setTimeout(() => {
+    if(!acertouPergunta){
+      Som.erro();
+      avisar("A máquina errou a pergunta e perdeu o tiro.");
+      return setTimeout(passarVez, 1100);
+    }
+    atirar("ele", p);
+  }, 550);
+}
+
+/* ---------- fim ---------- */
+
+function fimDaPartida(vencedor){
+  jogo.fase = "acabou";
+  const ganhei = vencedor === "eu";
+  if(ganhei) Som.vitoria(); else Som.pausa();
+  $("#fimTitulo").textContent = ganhei ? cfg.nome + " venceu a batalha" : "A máquina venceu";
+  $("#fimSub").textContent =
+    "Você acertou " + contarAcertos(jogo.meusTiros) + " de " + CASAS_COM_NAVIO +
+    " · a máquina acertou " + contarAcertos(jogo.tirosDela) + " de " + CASAS_COM_NAVIO;
+  UI.trocarTela("telaFim");
+}
+
+/* ---------------------------------------------------------
+   LIGAÇÕES
+   --------------------------------------------------------- */
+
+UI.iniciar({ titulo:"Batalha Naval", versao:VERSAO, regras:REGRAS, voltar:"index.html" });
+
+$("#btnPosicionar").addEventListener("click", abrirPosicionamento);
+$("#btnSortear").addEventListener("click", () => {
+  previewMar = sortearMar();
+  desenharMar($("#marPreview"), previewMar, null, true, null);
+  Som.toque();
+});
+$("#btnZarpar").addEventListener("click", zarpar);
+$("#btnSair").addEventListener("click", () => UI.trocarTela("telaPreparo"));
+$("#btnDeNovo").addEventListener("click", abrirPosicionamento);
+$("#btnVoltarPreparo").addEventListener("click", () => UI.trocarTela("telaPreparo"));
+
+montarPreparo();
+</script>
+</body>
+</html>
