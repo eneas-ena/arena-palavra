@@ -42,26 +42,37 @@
 .mesa.c4{grid-template-columns:repeat(4,1fr)}
 @media (max-width:360px){ .mesa{gap:5px} }
 
+/* A carta é um div, e não um button: dentro de um botão a altura
+   percentual dos filhos não tem contra o que se medir, e a folha
+   colapsa — a carta fica sem fundo e sem moldura.
+   A folha também não usa altura percentual: ela é item de grade,
+   e item de grade já se estica sozinho para preencher a área. */
 .carta{
   aspect-ratio:3/4;background:none;border:none;padding:0;
-  perspective:700px;-webkit-tap-highlight-color:transparent;
+  display:grid;perspective:700px;cursor:pointer;
+  -webkit-tap-highlight-color:transparent;
 }
-.carta:disabled{cursor:default}
+.carta[aria-disabled="true"]{cursor:default}
 .folha{
-  position:relative;width:100%;height:100%;
+  grid-area:1 / 1;position:relative;
   transform-style:preserve-3d;transition:transform .38s ease;
 }
 .carta.aberta .folha{transform:rotateY(180deg)}
 .face{
-  position:absolute;inset:0;border-radius:9px;
+  position:absolute;top:0;right:0;bottom:0;left:0;border-radius:9px;
   -webkit-backface-visibility:hidden;backface-visibility:hidden;
   display:grid;place-items:center;padding:6px;overflow:hidden;
 }
 .verso{
   background:var(--surface);border:1px solid var(--gold);
-  color:var(--gold);font-size:19px;opacity:.9;
+  color:var(--gold);opacity:.9;
 }
-.carta:not(:disabled):hover .verso{background:var(--surface-2)}
+.verso i{
+  display:block;width:34%;aspect-ratio:1;
+  border:1.5px solid var(--gold);opacity:.75;
+  transform:rotate(45deg);border-radius:3px;
+}
+.carta:not([aria-disabled="true"]):hover .verso{background:var(--surface-2)}
 .frente{
   background:var(--surface-2);border:1px solid var(--linha);
   transform:rotateY(180deg);
@@ -158,7 +169,7 @@
    v1.0.0
    ========================================================= */
 
-const VERSAO = "1.0.0";
+const VERSAO = "1.0.1";
 
 /* Mesa maior exige pergunta mais curta, senão o texto não cabe na carta. */
 const MESAS = {
@@ -331,9 +342,11 @@ function montarMesa(colunas){
   mesa.innerHTML = "";
 
   jogo.cartas.forEach((c, i) => {
-    const b = document.createElement("button");
+    const b = document.createElement("div");
     b.className = "carta";
     b.dataset.i = i;
+    b.setAttribute("role", "button");
+    b.setAttribute("tabindex", "0");
     b.setAttribute("aria-label", "Carta " + (i+1));
 
     const folha = document.createElement("span");
@@ -341,7 +354,7 @@ function montarMesa(colunas){
 
     const verso = document.createElement("span");
     verso.className = "face verso";
-    verso.textContent = "✦";
+    verso.appendChild(document.createElement("i"));
 
     const frente = document.createElement("span");
     frente.className = "face frente " + (c.tipo === "p" ? "pergunta " : "resposta ") + classeTexto(c.texto);
@@ -350,6 +363,9 @@ function montarMesa(colunas){
     folha.append(verso, frente);
     b.appendChild(folha);
     b.addEventListener("click", () => virar(i));
+    b.addEventListener("keydown", e => {
+      if(e.key === "Enter" || e.key === " "){ e.preventDefault(); virar(i); }
+    });
     mesa.appendChild(b);
   });
 }
@@ -400,12 +416,15 @@ function seguirVez(){
 
 function travar(t){
   $$("#mesa .carta").forEach((b, i) => {
-    b.disabled = t || jogo.achadas.has(i) || jogo.abertas.includes(i) || jogo.fase !== "escolher";
+    const bloqueada = t || jogo.achadas.has(i) || jogo.abertas.includes(i) || jogo.fase !== "escolher";
+    b.setAttribute("aria-disabled", String(bloqueada));
+    b.setAttribute("tabindex", bloqueada ? "-1" : "0");
   });
 }
 
 function virar(i){
-  if(jogo.fase !== "escolher") return;
+  if(!jogo || jogo.fase !== "escolher") return;
+  if($$("#mesa .carta")[i].getAttribute("aria-disabled") === "true") return;
   if(jogo.achadas.has(i) || jogo.abertas.includes(i)) return;
   if(atual().tipo === "maquina") return;
   abrirCarta(i);
