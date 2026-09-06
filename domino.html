@@ -214,7 +214,7 @@
    v1.0.0
    ========================================================= */
 
-const VERSAO = "1.3.0";
+const VERSAO = "1.3.1";
 const CORES_JOGADOR = ["#D4565F", "#C9A227", "#2A5B9C", "#2E6B4F"];
 const PIPS = {0:[],1:[4],2:[0,8],3:[0,4,8],4:[0,2,6,8],5:[0,2,4,6,8],6:[0,2,3,5,6,8]};
 
@@ -445,32 +445,39 @@ function desenharMesa(){
      no topo da outra. */
   const larg = (fila.clientWidth || 320);
   const U = Math.max(13, Math.min(28, Math.floor(larg / 11)));
-  const colunas = Math.max(4, Math.floor(larg / U));
+  const colunas = Math.max(5, Math.floor(larg / U));
   const passo = 3 * U;
 
+  /* Percurso em colunas absolutas, para a peça da esquina nunca cair
+     em cima da anterior: cada peça sabe em qual coluna começa e quantas
+     ocupa, e o caminho anda para a direita ou para a esquerda. */
   const postas = [];
-  let x = 0, linha = 0, paraDireita = true;
+  let coluna = 0, sentido = 1, banda = 0;
 
   jogo.mesa.forEach((pc, k) => {
     const carro = pc[0] === pc[1];
     const largura = carro ? 1 : 2;
+    /* Guarda sempre uma coluna livre no fim da linha: é onde a peça da
+       esquina vai ficar. Sem essa reserva, quando a linha fecha exatamente
+       na borda, a esquina é empurrada para cima da peça anterior. */
+    const cabe = sentido === 1 ? (coluna + largura <= colunas - 1)
+                               : (coluna - largura >= 1);
 
-    if(x + largura > colunas){
-      // esta peça dobra a esquina: desce e a fila inverte o sentido
-      postas.push({pc, k, linha, esquina:true, carro,
-                   visualX: carro
-                     ? (paraDireita ? (colunas - 2) * U : 0)
-                     : (paraDireita ? (colunas - 1) * U : 0)});
-      linha++;
-      paraDireita = !paraDireita;
-      x = 0;
+    if(!cabe){
+      // esta peça dobra a esquina: fica em pé e desce para a linha seguinte
+      let cx = sentido === 1 ? coluna : coluna - 1;
+      cx = Math.max(0, Math.min(cx, colunas - 1));
+      postas.push({pc, k, banda, esquina:true, cx, largura:1});
+      banda++;
+      sentido = -sentido;
+      coluna = sentido === 1 ? cx : cx + 1;
       return;
     }
 
-    postas.push({pc, k, linha, esquina:false, carro, largura,
-                 visualX: (paraDireita ? x : colunas - x - largura) * U,
-                 invertida: !paraDireita});
-    x += largura;
+    const cx = sentido === 1 ? coluna : coluna - largura;
+    postas.push({pc, k, banda, esquina:false, carro, cx, largura,
+                 invertida: sentido === -1});
+    coluna += sentido * largura;
   });
 
   let maisBaixo = 0;
@@ -479,32 +486,27 @@ function desenharMesa(){
     let pc = p.pc, emPe, larguraPx, alturaPx, topo;
 
     if(p.esquina){
-      // na esquina o caminho é para baixo: peça comum fica em pé,
-      // carroça fica deitada, atravessada ao caminho
-      emPe = !p.carro;
-      larguraPx = p.carro ? 2*U : U;
-      alturaPx  = p.carro ? U : 2*U;
-      topo = p.linha * passo + (p.carro ? 1.5*U : U);
+      emPe = true;                       // na esquina o caminho é para baixo
+      larguraPx = U; alturaPx = 2 * U;
+      topo = p.banda * passo + U;        // começa no meio da linha, termina na de baixo
     } else {
-      emPe = p.carro;
-      larguraPx = p.carro ? U : 2*U;
-      alturaPx  = p.carro ? 2*U : U;
-      topo = p.linha * passo + (p.carro ? 0 : 0.5*U);
+      emPe = p.carro;                    // carroça atravessada, comum deitada
+      larguraPx = p.carro ? U : 2 * U;
+      alturaPx  = p.carro ? 2 * U : U;
+      topo = p.banda * passo + (p.carro ? 0 : 0.5 * U);
       if(p.invertida) pc = [p.pc[1], p.pc[0]];
     }
 
     const d = desenharPeca(pc, !emPe);
     d.style.width  = larguraPx + "px";
     d.style.height = alturaPx + "px";
-    d.style.left   = p.visualX + "px";
+    d.style.left   = (p.cx * U) + "px";
     d.style.top    = topo + "px";
     if(p.k === 0 || p.k === jogo.mesa.length - 1) d.classList.add("extremo");
     fila.appendChild(d);
     maisBaixo = Math.max(maisBaixo, topo + alturaPx);
   });
 
-  // a altura sai do que foi realmente desenhado, e não do número de linhas:
-  // uma peça de esquina pode abrir uma linha que fica vazia
   fila.style.height = Math.ceil(maisBaixo) + "px";
 
   desenharPontas();
