@@ -116,6 +116,8 @@
     <p class="legenda" style="margin:14px 0 0" id="legendaRodadas">—</p>
   </div>
 
+  <div id="painelSala"></div>
+
   <button class="principal" id="btnComecar">Começar</button>
 </section>
 
@@ -163,6 +165,7 @@
 
 <script src="perguntas.js"></script>
 <script src="comum.js"></script>
+<script src="sala.js"></script>
 <script>
 "use strict";
 
@@ -173,7 +176,7 @@
    v1.0.0
    ========================================================= */
 
-const VERSAO = "1.0.2";
+const VERSAO = "1.1.0";
 
 const REGRAS = `
   <h2>Como se joga</h2>
@@ -292,6 +295,7 @@ function comecar(){
   UI.trocarTela("telaJogo");
   montarCasas();
   novaRodada(true);
+  publicar();
 }
 
 function jogadorDe(marca){ return cfg.jogadores.find(j => j.marca === marca); }
@@ -346,6 +350,11 @@ function seguirVez(){
   atualizarPlacar();
   const j = jogadorDe(jogo.vez);
 
+  if(Sala.ativa() && !souDaVez()){
+    travarCasas(true);
+    return avisar("Aguardando " + j.nome + " jogar no outro aparelho…");
+  }
+
   if(j.tipo === "maquina"){
     travarCasas(true);
     avisar(j.nome + " está pensando…");
@@ -380,13 +389,19 @@ function escolherCasa(i){
   travarCasas(true);
 
   const j = jogadorDe(jogo.vez);
+  esperandoResposta = true;
   Pergunta.abrir({
     para: j.nome,
     nivel: j.nivel,
     texto: (acertou) => acertou
       ? "Resposta certa. A casa é sua."
       : "Resposta errada. A casa fica livre e a vez passa.",
-    aoResponder: (acertou) => resolver(acertou)
+    aoResponder: (acertou) => {
+      esperandoResposta = false;
+      resolver(acertou);
+      // se chegou estado do outro aparelho enquanto eu respondia, ele manda
+      if(estadoGuardado){ const g = estadoGuardado; estadoGuardado = null; restaurar(g); }
+    }
   });
 }
 
@@ -408,6 +423,7 @@ function jogadaDaMaquina(){
 function resolver(acertou){
   const i = jogo.pendente;
   $$("#casas .casa").forEach(b => b.classList.remove("alvo"));
+  if(i === null || i === undefined) return seguirVez();
 
   if(acertou){
     jogo.casas[i] = jogo.vez;
@@ -421,6 +437,7 @@ function resolver(acertou){
 
   jogo.vez = jogo.vez === "X" ? "O" : "X";
   jogo.fase = "escolher";
+  publicar();
   setTimeout(seguirVez, 350);
 }
 
@@ -485,7 +502,9 @@ function riscarLinha(linha){
 
 /* ---------- fim de rodada e de partida ---------- */
 
-function fimDaRodada(marca, linha){
+/* contar = false quando a rodada já foi contada no outro aparelho
+   e este aqui só precisa mostrar o resultado. */
+function fimDaRodada(marca, linha, contar){
   jogo.fase = "parado";
   travarCasas(true);
   avisar("");
@@ -496,7 +515,7 @@ function fimDaRodada(marca, linha){
 
   if(marca){
     riscarLinha(linha);
-    jogo.pontos[marca]++;
+    if(contar !== false) jogo.pontos[marca]++;
     frase.textContent = jogadorDe(marca).nome + " ganhou a rodada";
     frase.classList.add("venceu");
     Som.chegou();
@@ -507,20 +526,26 @@ function fimDaRodada(marca, linha){
 
   atualizarPlacar();
   cx.appendChild(frase);
+  publicar();
 
   const acabou = jogo.pontos.X >= cfg.alvo || jogo.pontos.O >= cfg.alvo;
   if(acabou) return setTimeout(fimDaPartida, 1400);
 
   const b = document.createElement("button");
   b.className = "principal";
-  b.textContent = "Próxima rodada";
-  b.addEventListener("click", () => {
+  // numa sala, só quem abriu comanda a passagem de rodada:
+  // se os dois pudessem apertar, a rodada avançaria duas vezes
+  const comando = !Sala.ativa() || Sala.meuLugar === 0;
+  b.textContent = comando ? "Próxima rodada" : "Aguardando a próxima rodada…";
+  b.disabled = !comando;
+  if(comando) b.addEventListener("click", () => {
     jogo.rodada++;
     jogo.comeca = jogo.comeca === "X" ? "O" : "X";
     novaRodada(false);
+    publicar();
   });
   cx.appendChild(b);
-  b.focus();
+  if(comando) b.focus();
 }
 
 function fimDaPartida(){
@@ -593,6 +618,91 @@ function minimax(casas, daVez, eu, prof){
 }
 
 /* ---------------------------------------------------------
+   SALA — o mesmo estado dos dois lados
+
+   O aparelho que joga descreve a partida inteira e publica.
+   O outro recebe, redesenha e espera a sua vez. Nenhuma jogada
+   é recalculada do outro lado: o que vale é o estado recebido.
+   --------------------------------------------------------- */
+
+function lugarDaVez(){ return jogo && jogo.vez === "X" ? 0 : 1; }
+
+function souDaVez(){
+  return !Sala.ativa() || Sala.minhaVez(lugarDaVez());
+}
+
+/* Enquanto o aparelho está aplicando o estado que veio do outro,
+   ele não publica nada. Sem esta trava, um lado aplica, publica,
+   o outro aplica, publica de volta — e a partida dispara sozinha. */
+let aplicandoRemoto = false;
+let esperandoResposta = false;
+let estadoGuardado = null;
+
+function retratar(){
+  if(!jogo) return null;
+  return {
+    alvo: cfg.alvo,
+    nomes: cfg.jogadores.map(j => j.nome),
+    niveis: cfg.jogadores.map(j => j.nivel),
+    pontos: jogo.pontos,
+    rodada: jogo.rodada,
+    comeca: jogo.comeca,
+    casas: jogo.casas,
+    vez: jogo.vez,
+    fase: jogo.fase === "respondendo" ? "escolher" : jogo.fase
+  };
+}
+
+function restaurar(d){
+  if(!d) return;
+  // se a pergunta está aberta aqui, guarda para aplicar depois de respondida
+  if(esperandoResposta){ estadoGuardado = d; return; }
+  aplicandoRemoto = true;
+  try { aplicarEstado(d); } finally { aplicandoRemoto = false; }
+}
+
+function aplicarEstado(d){
+  cfg.alvo = d.alvo;
+  cfg.jogadores.forEach((j, i) => {
+    j.nome = (d.nomes[i] === "Máquina") ? "Jogador 2" : d.nomes[i];
+    j.nivel = d.niveis[i];
+    j.tipo = "humano";           // numa sala, os dois lados são pessoas
+  });
+  if(!jogo){ UI.trocarTela("telaJogo"); montarCasas(); }
+  jogo = jogo || {};
+  jogo.pontos = d.pontos;
+  jogo.rodada = d.rodada;
+  jogo.comeca = d.comeca;
+  jogo.casas = d.casas;
+  jogo.vez = d.vez;
+  jogo.fase = d.fase;
+  jogo.pendente = null;
+
+  $("#marcas").innerHTML = "";
+  $("#risco").innerHTML = "";
+  $("#resultadoRodada").innerHTML = "";
+  d.casas.forEach((m, i) => { if(m) desenharMarca(i, m); });
+
+  const venc = vencedor(jogo.casas);
+  if(venc) return fimDaRodada(venc.marca, venc.linha, false);
+  if(jogo.casas.every(c => c !== null)) return fimDaRodada(null, null, false);
+  seguirVez();
+}
+
+function publicar(){
+  if(Sala.ativa() && !aplicandoRemoto) Sala.publicar(retratar());
+}
+
+const GANCHOS_SALA = {
+  aoReceberEstado: (e) => restaurar(e),
+  aoPedirEstado: () => retratar(),
+  aoMudarGente: (n) => {
+    if(jogo && jogo.fase !== "fim" && n < 2)
+      avisar("O outro aparelho saiu da sala.");
+  }
+};
+
+/* ---------------------------------------------------------
    LIGAÇÕES
    --------------------------------------------------------- */
 
@@ -601,6 +711,27 @@ UI.iniciar({
   versao:VERSAO,
   regras:REGRAS,
   voltar:"index.html"
+});
+
+Sala.montarPainel($("#painelSala"), {
+  jogoId: "velha",
+  lugares: 2,
+  ganchos: GANCHOS_SALA,
+  aoLigar: (lugar) => {
+    // numa sala os dois são pessoas, e só o dono aperta "Começar"
+    cfg.modo = "dupla";
+    cfg.jogadores[1].tipo = "humano";
+    if(cfg.jogadores[1].nome === "Máquina") cfg.jogadores[1].nome = "Jogador 2";
+    montarPreparo();
+    $("#btnComecar").textContent = lugar === 0
+      ? "Começar (você comanda)" : "Esperando o outro aparelho começar";
+    $("#btnComecar").disabled = lugar !== 0;
+  },
+  aoDesligar: () => {
+    if(Sala.ativa()) Sala.fechar();
+    $("#btnComecar").textContent = "Começar";
+    $("#btnComecar").disabled = false;
+  }
 });
 
 $("#btnComecar").addEventListener("click", comecar);

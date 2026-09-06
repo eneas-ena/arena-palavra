@@ -149,3 +149,15 @@ main{max-width:560px;margin:0 auto;padding:18px 16px 40px}
   border-top:1px solid var(--linha);font-size:17px;
 }
 .placar-lista li span{flex:1}
+
+/* ---------- sala entre aparelhos ---------- */
+.codigo-sala{
+  font-family:'Cinzel',serif;font-size:34px;letter-spacing:6px;
+  color:var(--gold);margin:0 0 12px;
+}
+.campo-codigo{
+  width:100%;padding:13px;border-radius:9px;border:1px solid var(--linha);
+  background:var(--surface-2);color:var(--ink);
+  font-family:'Cinzel',serif;font-size:26px;
+  text-align:center;letter-spacing:6px;text-transform:uppercase;
+}
