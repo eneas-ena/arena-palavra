@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0F1B33">
+<title>Reversi — Arena da Palavra</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="32x32" href="icone-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icone-192.png">
+<link rel="apple-touch-icon" href="icone-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Arena da Palavra">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="comum.css">
+<style>
+/* Espaçamento em pixels: porcentagem no sentido vertical não tem
+   contra o que se medir enquanto a altura vem das próprias casas. */
+
+.placar{display:flex;align-items:stretch;gap:10px;margin-bottom:13px}
+.placar .lado{
+  flex:1;text-align:center;padding:10px 8px;border-radius:10px;
+  background:var(--surface);border:1px solid var(--linha);
+  transition:border-color .2s, background .2s;
+}
+.placar .lado.vez{border-color:var(--cor-lado);background:color-mix(in srgb, var(--cor-lado) 15%, var(--surface))}
+.placar .lado .quem{
+  display:block;font-family:'Cinzel',serif;font-size:13px;color:var(--ink-dim);
+  margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.placar .lado.vez .quem{color:var(--cor-lado)}
+.placar .lado .pontos{font-size:27px;line-height:1;font-family:'Cinzel',serif;color:var(--cor-lado);font-variant-numeric:tabular-nums}
+.placar .meio{align-self:center;font-size:13px;color:var(--ink-dim);text-align:center;min-width:54px;line-height:1.25}
+
+.arena{width:100%;max-width:420px;margin:0 auto}
+.tabuleiro{
+  display:grid;grid-template-columns:repeat(8,1fr);gap:3px;
+  background:var(--surface);border:1px solid var(--linha);
+  border-radius:10px;padding:6px;align-content:start;
+}
+.casa{
+  width:100%;aspect-ratio:1;border-radius:4px;padding:0;border:none;
+  background:var(--surface-2);display:grid;place-items:center;
+  -webkit-tap-highlight-color:transparent;transition:background .15s;
+}
+.casa:disabled{cursor:default}
+.casa.canto{background:color-mix(in srgb, var(--gold) 18%, var(--surface-2))}
+.casa.pode{background:rgba(201,162,39,.20);cursor:pointer}
+.casa.pode:hover{background:rgba(201,162,39,.42)}
+.casa.pode::after{
+  content:'';width:30%;aspect-ratio:1;border-radius:50%;
+  border:1.5px solid var(--gold);opacity:.8;
+}
+.casa.pode.canto::after{width:42%;border-width:2px;opacity:1}
+
+.peca{
+  width:82%;aspect-ratio:1;border-radius:50%;
+  box-shadow:inset 0 -2px 4px rgba(0,0,0,.4), inset 0 2px 4px rgba(255,255,255,.3);
+  animation:pousa .25s ease-out;
+}
+.peca.x{background:var(--carmim-claro)}
+.peca.o{background:var(--gold-soft)}
+.peca.virou{animation:gira .4s ease-out}
+.peca.ultima{box-shadow:0 0 0 2px var(--ink), inset 0 -2px 4px rgba(0,0,0,.4)}
+@keyframes pousa{from{transform:scale(.3);opacity:0}}
+@keyframes gira{from{transform:rotateY(180deg) scale(.75)}}
+@media (prefers-reduced-motion:reduce){.peca,.peca.virou{animation:none}}
+
+.desfecho{text-align:center;margin-top:14px}
+.desfecho .frase{font-family:'Cinzel',serif;font-size:19px;margin:0 0 10px}
+.desfecho .frase.venceu{color:var(--gold)}
+</style>
+</head>
+<body>
+
+<header></header>
+
+<main>
+
+<!-- ============ PREPARO ============ -->
+<section class="tela ativa" id="telaPreparo">
+  <div class="bloco">
+    <h2>Quem joga</h2>
+    <div class="escolhas" id="escModo"></div>
+  </div>
+
+  <div class="bloco">
+    <h2>Os jogadores</h2>
+    <div id="listaJogadores"></div>
+  </div>
+
+  <button class="principal" id="btnComecar">Começar</button>
+</section>
+
+<!-- ============ JOGO ============ -->
+<section class="tela" id="telaJogo">
+  <div class="placar">
+    <div class="lado" id="ladoX"><span class="quem">—</span><span class="pontos">2</span></div>
+    <div class="meio" id="meioPlacar">—</div>
+    <div class="lado" id="ladoO"><span class="quem">—</span><span class="pontos">2</span></div>
+  </div>
+
+  <div class="arena">
+    <div class="tabuleiro" id="tabuleiro"></div>
+  </div>
+
+  <p class="aviso" id="aviso">—</p>
+  <div class="desfecho" id="desfecho"></div>
+  <button class="secundario" id="btnSair">Encerrar e voltar</button>
+</section>
+
+<!-- ============ FIM ============ -->
+<section class="tela" id="telaFim">
+  <div class="fim">
+    <h2 id="fimTitulo">—</h2>
+    <p class="legenda" id="fimSub">—</p>
+    <ol class="placar-lista" id="placarFinal"></ol>
+    <button class="principal" id="btnDeNovo">Jogar de novo</button>
+    <button class="secundario" id="btnVoltarPreparo">Mudar as opções</button>
+  </div>
+</section>
+
+</main>
+
+<script src="perguntas.js"></script>
+<script src="comum.js"></script>
+<script>
+"use strict";
+
+/* =========================================================
+   REVERSI — Arena da Palavra
+   Cerque as peças do adversário e elas viram da sua cor.
+   Os quatro cantos são as únicas casas que nunca mais viram —
+   e por isso são as únicas que exigem responder uma pergunta.
+   v1.0.0
+   ========================================================= */
+
+const VERSAO = "1.0.0";
+const N = 8;
+const CANTOS = [0, 7, 56, 63];
+
+const DIRECOES = [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]];
+
+/* Peso de cada casa. Canto vale ouro; a casa diagonal ao canto é
+   veneno, porque entrega o canto ao adversário. */
+const PESOS = [
+  120,-20, 20,  5,  5, 20,-20,120,
+  -20,-40, -5, -5, -5, -5,-40,-20,
+   20, -5, 15,  3,  3, 15, -5, 20,
+    5, -5,  3,  3,  3,  3, -5,  5,
+    5, -5,  3,  3,  3,  3, -5,  5,
+   20, -5, 15,  3,  3, 15, -5, 20,
+  -20,-40, -5, -5, -5, -5,-40,-20,
+  120,-20, 20,  5,  5, 20,-20,120
+];
+
+const PROFUNDIDADE = {1:1, 2:3, 3:5};
+const ACASO = {1:0.5, 2:0.08, 3:0};
+
+const REGRAS = `
+  <h2>Como se joga</h2>
+
+  <h3>O objetivo</h3>
+  <p>Terminar a partida com mais peças da sua cor no tabuleiro. Só isso: não importa quem esteve na frente no meio do caminho.</p>
+
+  <h3>A jogada</h3>
+  <p>Você só pode pôr uma peça numa casa que prenda peças do adversário entre a peça nova e alguma peça sua — em linha reta, na horizontal, na vertical ou na diagonal. Todas as peças presas viram da sua cor. As casas onde isso é possível ficam marcadas.</p>
+  <p>Se não houver jogada possível, você passa a vez. Se nenhum dos dois puder jogar, a partida acaba.</p>
+
+  <h3>Os cantos e a pergunta</h3>
+  <p>As quatro casas dos cantos são as únicas que nunca podem ser viradas — quem toma um canto o tem até o fim. Por isso, aqui, ocupar um canto exige responder uma pergunta bíblica. Acertando, o canto é seu; errando, a jogada se perde e a vez passa.</p>
+
+  <h3>Estar na frente cedo atrapalha</h3>
+  <p>Quem vira muitas peças no começo fica com pouca liberdade de movimento depois. Reversi se ganha no fim, não no meio.</p>
+
+  <h3>Cuidado com as casas ao lado do canto</h3>
+  <p>Pôr uma peça na diagonal de um canto vazio quase sempre entrega esse canto ao adversário. É o erro mais comum de quem está aprendendo.</p>
+`;
+
+let cfg = {
+  modo:"maquina",
+  jogadores:[
+    {marca:"X", nome:"Você",    tipo:"humano",  nivel:2},
+    {marca:"O", nome:"Máquina", tipo:"maquina", nivel:2}
+  ]
+};
+let jogo = null;
+
+const lin = p => Math.floor(p / N);
+const col = p => p % N;
+const outra = m => m === "X" ? "O" : "X";
+
+/* ---------------------------------------------------------
+   REGRAS PURAS
+   --------------------------------------------------------- */
+
+function viradas(tab, p, marca){
+  if(tab[p] !== null) return [];
+  const inimiga = outra(marca);
+  const fora = [];
+  for(const [dl, dc] of DIRECOES){
+    let l = lin(p) + dl, c = col(p) + dc;
+    const fila = [];
+    while(l >= 0 && l < N && c >= 0 && c < N && tab[l*N + c] === inimiga){
+      fila.push(l*N + c); l += dl; c += dc;
+    }
+    if(fila.length && l >= 0 && l < N && c >= 0 && c < N && tab[l*N + c] === marca)
+      fora.push(...fila);
+  }
+  return fora;
+}
+
+function jogadas(tab, marca){
+  const fora = [];
+  for(let p = 0; p < N*N; p++){
+    if(tab[p] !== null) continue;
+    const v = viradas(tab, p, marca);
+    if(v.length) fora.push({p, vira:v});
+  }
+  return fora;
+}
+
+function contar(tab, marca){
+  let n = 0;
+  for(let p = 0; p < N*N; p++) if(tab[p] === marca) n++;
+  return n;
+}
+
+function aplicar(tab, p, marca){
+  const novo = tab.slice();
+  novo[p] = marca;
+  viradas(tab, p, marca).forEach(q => novo[q] = marca);
+  return novo;
+}
+
+/* ---------------------------------------------------------
+   PREPARO
+   --------------------------------------------------------- */
+
+function montarPreparo(){
+  UI.escolhas($("#escModo"),
+    [{valor:"maquina", rotulo:"Contra a máquina"}, {valor:"dupla", rotulo:"Dois no aparelho"}],
+    cfg.modo, v => {
+      cfg.modo = v;
+      cfg.jogadores[1].tipo = (v === "maquina") ? "maquina" : "humano";
+      if(v === "maquina" && cfg.jogadores[1].nome === "Jogador 2") cfg.jogadores[1].nome = "Máquina";
+      if(v === "dupla"   && cfg.jogadores[1].nome === "Máquina")   cfg.jogadores[1].nome = "Jogador 2";
+      montarPreparo();
+    });
+
+  const lista = $("#listaJogadores");
+  lista.innerHTML = "";
+  cfg.jogadores.forEach(j => {
+    const linha = document.createElement("div");
+    linha.className = "jogador-linha";
+    const bola = document.createElement("span");
+    bola.className = "bolinha";
+    bola.style.background = j.marca === "X" ? "var(--carmim-claro)" : "var(--gold)";
+    const nome = document.createElement("input");
+    nome.type = "text"; nome.value = j.nome; nome.maxLength = 16;
+    nome.setAttribute("aria-label", "Nome do jogador");
+    nome.addEventListener("input", () => { j.nome = nome.value.trim() || ("Jogador " + j.marca); });
+    const nivel = document.createElement("select");
+    nivel.setAttribute("aria-label", "Nível");
+    [[1,"Fácil"],[2,"Médio"],[3,"Difícil"]].forEach(([v,t]) => {
+      const o = document.createElement("option"); o.value = v; o.textContent = t;
+      if(v === j.nivel) o.selected = true; nivel.appendChild(o);
+    });
+    nivel.addEventListener("change", () => { j.nivel = Number(nivel.value); });
+    linha.append(bola, nome, nivel);
+    lista.appendChild(linha);
+  });
+}
+
+/* ---------------------------------------------------------
+   PARTIDA
+   --------------------------------------------------------- */
+
+function comecar(){
+  Banco.zerar();
+  const tab = Array(N*N).fill(null);
+  tab[27] = "O"; tab[28] = "X"; tab[35] = "X"; tab[36] = "O";
+  jogo = { tab, vez:"X", fase:"jogar", passouSeguido:0, ultima:null, virando:[] };
+  UI.trocarTela("telaJogo");
+  $("#desfecho").innerHTML = "";
+  montarTabuleiro();
+  seguirVez();
+}
+
+function jogadorDe(m){ return cfg.jogadores.find(j => j.marca === m); }
+
+function montarTabuleiro(){
+  const t = $("#tabuleiro");
+  t.innerHTML = "";
+  for(let p = 0; p < N*N; p++){
+    const b = document.createElement("button");
+    b.className = "casa" + (CANTOS.includes(p) ? " canto" : "");
+    b.dataset.p = p;
+    b.setAttribute("aria-label",
+      String.fromCharCode(65 + col(p)) + (lin(p) + 1) + (CANTOS.includes(p) ? ", canto" : ""));
+    b.addEventListener("click", () => tocar(p));
+    t.appendChild(b);
+  }
+  redesenhar();
+}
+
+function redesenhar(){
+  const casas = $$("#tabuleiro .casa");
+  const meuTurno = jogo.fase === "jogar" && jogadorDe(jogo.vez).tipo === "humano";
+  const possiveis = meuTurno ? jogadas(jogo.tab, jogo.vez).map(m => m.p) : [];
+
+  casas.forEach((b, p) => {
+    const marca = jogo.tab[p];
+    b.innerHTML = "";
+    b.classList.toggle("pode", possiveis.includes(p));
+    b.disabled = !possiveis.includes(p);
+    if(marca){
+      const d = document.createElement("span");
+      d.className = "peca " + (marca === "X" ? "x" : "o")
+                  + (jogo.virando.includes(p) ? " virou" : "")
+                  + (jogo.ultima === p ? " ultima" : "");
+      b.appendChild(d);
+    }
+  });
+  atualizarPlacar();
+}
+
+function atualizarPlacar(){
+  const lx = $("#ladoX"), lo = $("#ladoO");
+  lx.style.setProperty("--cor-lado", "var(--carmim-claro)");
+  lo.style.setProperty("--cor-lado", "var(--gold-soft)");
+  $(".quem", lx).textContent = jogadorDe("X").nome;
+  $(".quem", lo).textContent = jogadorDe("O").nome;
+  $(".pontos", lx).textContent = contar(jogo.tab, "X");
+  $(".pontos", lo).textContent = contar(jogo.tab, "O");
+  lx.classList.toggle("vez", jogo.vez === "X" && jogo.fase !== "fim");
+  lo.classList.toggle("vez", jogo.vez === "O" && jogo.fase !== "fim");
+  const vazias = jogo.tab.filter(x => x === null).length;
+  $("#meioPlacar").innerHTML = vazias + "<br>casas<br>livres";
+}
+
+function avisar(t){ $("#aviso").textContent = t || ""; }
+
+function seguirVez(){
+  jogo.fase = "jogar";
+  jogo.virando = [];
+  const j = jogadorDe(jogo.vez);
+  const minhas = jogadas(jogo.tab, jogo.vez);
+
+  if(minhas.length === 0){
+    jogo.passouSeguido++;
+    redesenhar();
+    if(jogo.passouSeguido >= 2) return fimDaPartida();
+    avisar(j.nome + " não tem jogada e passa a vez.");
+    Som.pausa();
+    jogo.vez = outra(jogo.vez);
+    return setTimeout(seguirVez, 1200);
+  }
+  jogo.passouSeguido = 0;
+  redesenhar();
+
+  if(j.tipo === "maquina"){
+    avisar(j.nome + " está pensando…");
+    setTimeout(jogadaDaMaquina, 650);
+  } else {
+    const temCanto = minhas.some(m => CANTOS.includes(m.p));
+    avisar(temCanto
+      ? j.nome + ", há um canto ao seu alcance — e canto exige pergunta."
+      : j.nome + ", escolha uma casa marcada.");
+  }
+}
+
+/* ---------- a jogada ---------- */
+
+function tocar(p){
+  if(jogo.fase !== "jogar") return;
+  if(jogadorDe(jogo.vez).tipo !== "humano") return;
+  const m = jogadas(jogo.tab, jogo.vez).find(x => x.p === p);
+  if(!m) return;
+
+  if(CANTOS.includes(p)){
+    jogo.fase = "respondendo";
+    Som.toque();
+    const j = jogadorDe(jogo.vez);
+    return Pergunta.abrir({
+      para: j.nome,
+      nivel: j.nivel,
+      texto: a => a ? "Resposta certa. O canto é seu." : "Resposta errada. O canto escapou e a vez passa.",
+      aoResponder: (acertou) => {
+        if(!acertou){
+          Som.erro();
+          avisar("O canto escapou.");
+          jogo.vez = outra(jogo.vez);
+          return setTimeout(seguirVez, 900);
+        }
+        executar(m);
+      }
+    });
+  }
+  executar(m);
+}
+
+function executar(m){
+  jogo.fase = "movendo";
+  jogo.tab = aplicar(jogo.tab, m.p, jogo.vez);
+  jogo.ultima = m.p;
+  jogo.virando = m.vira;
+  Som.marcar();
+  redesenhar();
+
+  const quem = jogadorDe(jogo.vez).nome;
+  avisar(CANTOS.includes(m.p)
+    ? quem + " tomou um canto e virou " + m.vira.length + (m.vira.length === 1 ? " peça." : " peças.")
+    : quem + " virou " + m.vira.length + (m.vira.length === 1 ? " peça." : " peças."));
+
+  if(jogo.tab.every(x => x !== null)) return setTimeout(fimDaPartida, 900);
+
+  jogo.vez = outra(jogo.vez);
+  setTimeout(seguirVez, 750);
+}
+
+/* ---------------------------------------------------------
+   A MÁQUINA
+   --------------------------------------------------------- */
+
+function avaliar(tab, eu){
+  const ele = outra(eu);
+  const vazias = tab.filter(x => x === null).length;
+
+  if(vazias === 0){
+    const d = contar(tab, eu) - contar(tab, ele);
+    return d > 0 ? 100000 : d < 0 ? -100000 : 0;
+  }
+
+  let posicao = 0;
+  for(let p = 0; p < N*N; p++){
+    if(tab[p] === eu) posicao += PESOS[p];
+    else if(tab[p] === ele) posicao -= PESOS[p];
+  }
+
+  const meus = jogadas(tab, eu).length;
+  const dele = jogadas(tab, ele).length;
+  const mobilidade = (meus + dele) ? 100 * (meus - dele) / (meus + dele) : 0;
+
+  let cantos = 0;
+  CANTOS.forEach(p => { if(tab[p] === eu) cantos += 25; else if(tab[p] === ele) cantos -= 25; });
+
+  // no fim da partida, o que vale mesmo é a contagem de peças
+  if(vazias <= 12){
+    const d = contar(tab, eu) - contar(tab, ele);
+    return posicao * 0.3 + cantos * 4 + d * 12;
+  }
+  return posicao + mobilidade * 2.5 + cantos * 6;
+}
+
+function buscar(tab, prof, alfa, beta, daVez, eu, passouAntes){
+  const minhas = jogadas(tab, daVez);
+  if(minhas.length === 0){
+    if(passouAntes) return avaliar(tab, eu);
+    return buscar(tab, prof, alfa, beta, outra(daVez), eu, true);
+  }
+  if(prof === 0) return avaliar(tab, eu);
+
+  // canto primeiro: melhora muito o corte alfa-beta
+  minhas.sort((a, b) => PESOS[b.p] - PESOS[a.p]);
+  const maximiza = daVez === eu;
+  let melhor = maximiza ? -Infinity : Infinity;
+
+  for(const m of minhas){
+    const filho = aplicar(tab, m.p, daVez);
+    const n = buscar(filho, prof - 1, alfa, beta, outra(daVez), eu, false);
+    if(maximiza){ melhor = Math.max(melhor, n); alfa = Math.max(alfa, melhor); }
+    else        { melhor = Math.min(melhor, n); beta  = Math.min(beta,  melhor); }
+    if(alfa >= beta) break;
+  }
+  return melhor;
+}
+
+function jogadaDaMaquina(){
+  const j = jogadorDe(jogo.vez);
+  const minhas = jogadas(jogo.tab, jogo.vez);
+  if(minhas.length === 0) return seguirVez();
+
+  let escolha;
+  if(Math.random() < ACASO[j.nivel]){
+    escolha = minhas[Math.floor(Math.random() * minhas.length)];
+  } else {
+    const prof = PROFUNDIDADE[j.nivel];
+    let melhor = -Infinity;
+    escolha = minhas[0];
+    minhas.sort((a, b) => PESOS[b.p] - PESOS[a.p]);
+    for(const m of minhas){
+      const filho = aplicar(jogo.tab, m.p, jogo.vez);
+      const n = buscar(filho, prof - 1, -Infinity, Infinity, outra(jogo.vez), jogo.vez, false);
+      if(n > melhor){ melhor = n; escolha = m; }
+    }
+  }
+
+  // canto também custa pergunta para ela
+  if(CANTOS.includes(escolha.p)){
+    const acertou = Math.random() < ACERTO_MAQUINA[j.nivel];
+    return setTimeout(() => {
+      if(!acertou){
+        Som.erro();
+        avisar(j.nome + " chegou a um canto mas errou a pergunta.");
+        jogo.vez = outra(jogo.vez);
+        return setTimeout(seguirVez, 1100);
+      }
+      Som.acerto();
+      executar(escolha);
+    }, 700);
+  }
+  executar(escolha);
+}
+
+/* ---------------------------------------------------------
+   FIM
+   --------------------------------------------------------- */
+
+function fimDaPartida(){
+  jogo.fase = "fim";
+  const x = contar(jogo.tab, "X"), o = contar(jogo.tab, "O");
+  redesenhar();
+  Som.vitoria();
+
+  const empate = x === o;
+  const venc = x > o ? "X" : "O";
+  $("#fimTitulo").textContent = empate ? "Empate" : jogadorDe(venc).nome + " venceu";
+  $("#fimSub").textContent = x + " a " + o + " em 64 casas";
+
+  const ol = $("#placarFinal");
+  ol.innerHTML = "";
+  ["X","O"].sort((a,b) => contar(jogo.tab, b) - contar(jogo.tab, a)).forEach(m => {
+    const li = document.createElement("li");
+    const bola = document.createElement("span");
+    bola.className = "bolinha";
+    bola.style.background = m === "X" ? "var(--carmim-claro)" : "var(--gold)";
+    const nome = document.createElement("span"); nome.textContent = jogadorDe(m).nome;
+    const pts = document.createElement("span");
+    pts.style.flex = "0"; pts.style.color = "var(--ink-dim)";
+    pts.textContent = contar(jogo.tab, m);
+    li.append(bola, nome, pts);
+    ol.appendChild(li);
+  });
+  UI.trocarTela("telaFim");
+}
+
+/* ---------------------------------------------------------
+   LIGAÇÕES
+   --------------------------------------------------------- */
+
+UI.iniciar({ titulo:"Reversi", versao:VERSAO, regras:REGRAS, voltar:"index.html" });
+
+$("#btnComecar").addEventListener("click", comecar);
+$("#btnSair").addEventListener("click", () => UI.trocarTela("telaPreparo"));
+$("#btnDeNovo").addEventListener("click", comecar);
+$("#btnVoltarPreparo").addEventListener("click", () => UI.trocarTela("telaPreparo"));
+
+montarPreparo();
+</script>
+</body>
+</html>
