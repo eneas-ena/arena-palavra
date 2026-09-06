@@ -225,7 +225,7 @@
    v1.0.0
    ========================================================= */
 
-const VERSAO = "2.1.0";
+const VERSAO = "2.1.1";
 const CORES_JOGADOR = ["#D4565F", "#C9A227", "#2A5B9C", "#2E6B4F"];
 const PIPS = {0:[],1:[4],2:[0,8],3:[0,4,8],4:[0,2,6,8],5:[0,2,4,6,8],6:[0,2,3,5,6,8]};
 
@@ -516,7 +516,10 @@ function desenharMesa(){
   const larg = (fila.clientWidth || 320);
   const U = Math.max(13, Math.min(28, Math.floor(larg / 11)));
   const colunas = Math.max(5, Math.floor(larg / U));
-  const passo = 3 * U;
+  /* Distância entre linhas = 2U, que é o comprimento de uma peça.
+     A peça da esquina começa na linha de cima e termina exatamente
+     na linha de baixo, fechando o "L" sem folga nem sobreposição. */
+  const passo = 2 * U;
 
   /* Percurso em colunas absolutas, para a peça da esquina nunca cair
      em cima da anterior: cada peça sabe em qual coluna começa e quantas
@@ -540,7 +543,9 @@ function desenharMesa(){
       postas.push({pc, k, banda, esquina:true, cx, largura:1});
       banda++;
       sentido = -sentido;
-      coluna = sentido === 1 ? cx : cx + 1;
+      // a linha seguinte encosta na esquina pelo lado, formando o "L":
+      // ela não pode ocupar a mesma coluna da peça que desceu
+      coluna = sentido === 1 ? cx + 1 : cx;
       return;
     }
 
@@ -558,7 +563,7 @@ function desenharMesa(){
     if(p.esquina){
       emPe = true;                       // na esquina o caminho é para baixo
       larguraPx = U; alturaPx = 2 * U;
-      topo = p.banda * passo + U;        // começa no meio da linha, termina na de baixo
+      topo = p.banda * passo + U;        // desce da linha de cima até a linha de baixo
     } else {
       emPe = p.carro;                    // carroça atravessada, comum deitada
       larguraPx = p.carro ? U : 2 * U;
