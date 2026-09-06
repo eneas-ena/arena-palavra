@@ -65,14 +65,18 @@
 .ponta small{display:block;font-size:11px;color:var(--ink-dim);font-family:'Cormorant Garamond',serif}
 .ponta b{font-size:23px;color:var(--gold)}
 
-/* Mesa quadrada: as peças quebram em linhas em vez de esticar numa
-   tira única com rolagem horizontal. */
+/* Mesa como a de verdade: a fila corre na horizontal, as carroças entram
+   atravessadas e, ao chegar na borda, a fila desce e volta pelo outro lado.
+   As peças são posicionadas por conta, então o container é relativo. */
 .mesa{
-  display:flex;flex-wrap:wrap;gap:4px;align-content:flex-start;justify-content:center;
+  position:relative;
   background:var(--surface);border:1px solid var(--linha);
-  border-radius:10px;padding:9px;min-height:56px;
+  border-radius:10px;padding:9px;min-height:66px;
+  display:grid;place-items:center;
 }
-.mesa:empty::after{content:'a mesa está vazia';color:var(--ink-dim);font-size:15px;margin:auto}
+.mesa .fila{position:relative;width:100%}
+.mesa .peca{position:absolute;margin:0}
+.mesa .vazia{color:var(--ink-dim);font-size:15px}
 .mesa .peca.extremo{box-shadow:0 0 0 2px var(--gold)}
 
 /* A escolha da ponta fica junto da mão, onde o dedo já está. */
@@ -210,7 +214,7 @@
    v1.0.0
    ========================================================= */
 
-const VERSAO = "1.1.0";
+const VERSAO = "1.2.0";
 const CORES_JOGADOR = ["#D4565F", "#C9A227", "#2A5B9C", "#2E6B4F"];
 const PIPS = {0:[],1:[4],2:[0,8],3:[0,4,8],4:[0,2,6,8],5:[0,2,4,6,8],6:[0,2,3,5,6,8]};
 
@@ -419,12 +423,55 @@ function montarFaixa(){
 function desenharMesa(){
   const m = $("#mesa");
   m.innerHTML = "";
+
+  if(jogo.mesa.length === 0){
+    const v = document.createElement("span");
+    v.className = "vazia";
+    v.textContent = "a mesa está vazia";
+    m.appendChild(v);
+    return desenharPontas();
+  }
+
+  const fila = document.createElement("div");
+  fila.className = "fila";
+  m.appendChild(fila);
+
+  /* U é o lado do quadradinho. Peça deitada ocupa 2U por 1U;
+     carroça entra em pé, ocupando 1U por 2U — como na mesa de verdade. */
+  const larg = (fila.clientWidth || 320);
+  const U = Math.max(14, Math.min(30, Math.floor(larg / 11)));
+  const porLinha = Math.max(4, Math.floor(larg / U));
+  const banda = 2 * U + 5;
+
+  // primeiro descobre onde cada peça cai
+  const postas = [];
+  let x = 0, linha = 0;
   jogo.mesa.forEach((pc, k) => {
-    const d = desenharPeca(pc, true);
-    if(k === 0 || k === jogo.mesa.length - 1) d.classList.add("extremo");
-    m.appendChild(d);
+    const emPe = pc[0] === pc[1];
+    const largura = emPe ? 1 : 2;
+    if(x + largura > porLinha){ linha++; x = 0; }
+    postas.push({pc, k, x, linha, emPe, largura});
+    x += largura;
   });
 
+  fila.style.height = ((linha + 1) * banda) + "px";
+
+  postas.forEach(p => {
+    const daEsquerda = p.linha % 2 === 0;          // linhas ímpares correm ao contrário
+    const pc = daEsquerda ? p.pc : [p.pc[1], p.pc[0]];
+    const d = desenharPeca(pc, !p.emPe);
+    d.style.width  = (p.emPe ? U : 2*U) + "px";
+    d.style.height = (p.emPe ? 2*U : U) + "px";
+    d.style.left   = (daEsquerda ? p.x * U : (porLinha - p.x - p.largura) * U) + "px";
+    d.style.top    = (p.linha * banda + (p.emPe ? 0 : U / 2)) + "px";
+    if(p.k === 0 || p.k === jogo.mesa.length - 1) d.classList.add("extremo");
+    fila.appendChild(d);
+  });
+
+  desenharPontas();
+}
+
+function desenharPontas(){
   const p = $("#pontas");
   p.innerHTML = "";
   if(jogo.mesa.length === 0){
@@ -782,6 +829,12 @@ function fimDaPartida(){
 UI.iniciar({ titulo:"Dominó", versao:VERSAO, regras:REGRAS, voltar:"index.html" });
 
 $("#btnComecar").addEventListener("click", comecar);
+let reajuste = null;
+window.addEventListener("resize", () => {
+  clearTimeout(reajuste);
+  reajuste = setTimeout(() => { if(jogo && jogo.mesa) desenharMesa(); }, 180);
+});
+
 $("#btnPontaL").addEventListener("click", () => {
   if(jogo && jogo.escolhida) encaixar(jogo.escolhida.i, "l");
 });
