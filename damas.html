@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0F1B33">
+<title>Damas — Arena da Palavra</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="32x32" href="icone-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icone-192.png">
+<link rel="apple-touch-icon" href="icone-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Arena da Palavra">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="comum.css">
+<style>
+.placar{display:flex;align-items:stretch;gap:10px;margin-bottom:13px}
+.placar .lado{
+  flex:1;text-align:center;padding:10px 8px;border-radius:10px;
+  background:var(--surface);border:1px solid var(--linha);
+  transition:border-color .2s, background .2s;
+}
+.placar .lado.vez{border-color:var(--cor-lado);background:color-mix(in srgb, var(--cor-lado) 15%, var(--surface))}
+.placar .lado .quem{
+  display:block;font-family:'Cinzel',serif;font-size:13px;color:var(--ink-dim);
+  margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.placar .lado.vez .quem{color:var(--cor-lado)}
+.placar .lado .pontos{font-size:26px;line-height:1;font-family:'Cinzel',serif;color:var(--cor-lado);font-variant-numeric:tabular-nums}
+.placar .lado .damas{display:block;font-size:13px;color:var(--ink-dim);min-height:16px}
+.placar .meio{align-self:center;font-size:13px;color:var(--ink-dim);text-align:center;min-width:52px;line-height:1.25}
+
+.arena{width:100%;max-width:420px;margin:0 auto}
+.tabuleiro{
+  display:grid;grid-template-columns:repeat(8,1fr);
+  border:2px solid var(--casa-borda);border-radius:8px;overflow:hidden;
+}
+.casa{
+  width:100%;aspect-ratio:1;padding:0;border:none;position:relative;
+  display:grid;place-items:center;-webkit-tap-highlight-color:transparent;
+}
+.casa.clara{background:#E8DFC8}
+.casa.escura{background:#7A6A4F}
+[data-tema="claro"] .casa.escura{background:#8A7A5C}
+.casa:disabled{cursor:default}
+.casa.destino{cursor:pointer}
+.casa.destino::after{
+  content:'';width:34%;aspect-ratio:1;border-radius:50%;
+  background:var(--gold);opacity:.85;position:absolute;
+}
+.casa.destino:hover::after{opacity:1;width:42%}
+.casa.comendo::after{background:var(--carmim-claro);width:44%}
+
+.pedra{
+  width:76%;aspect-ratio:1;border-radius:50%;position:relative;
+  box-shadow:inset 0 -3px 5px rgba(0,0,0,.4), inset 0 3px 5px rgba(255,255,255,.3), 0 1px 3px rgba(0,0,0,.4);
+  display:grid;place-items:center;
+  animation:pousa .22s ease-out;
+}
+.pedra.x{background:var(--carmim-claro)}
+.pedra.o{background:var(--gold-soft)}
+.pedra.dama::after{
+  content:'';width:46%;aspect-ratio:1;
+  border:2.5px solid rgba(0,0,0,.45);border-radius:50%;
+}
+.pedra.dama.o::after{border-color:rgba(0,0,0,.55)}
+.pedra.movivel{cursor:pointer;box-shadow:0 0 0 3px var(--ink), inset 0 -3px 5px rgba(0,0,0,.4)}
+.pedra.escolhida{box-shadow:0 0 0 4px var(--gold), 0 0 12px var(--gold)}
+.pedra.condenada{opacity:.45;filter:grayscale(.5)}
+@keyframes pousa{from{transform:scale(.6);opacity:.2}}
+@media (prefers-reduced-motion:reduce){.pedra{animation:none}}
+
+.desfecho{text-align:center;margin-top:14px}
+.desfecho .frase{font-family:'Cinzel',serif;font-size:19px;margin:0 0 10px}
+.desfecho .frase.venceu{color:var(--gold)}
+</style>
+</head>
+<body>
+
+<header></header>
+
+<main>
+
+<!-- ============ PREPARO ============ -->
+<section class="tela ativa" id="telaPreparo">
+  <div class="bloco">
+    <h2>Quem joga</h2>
+    <div class="escolhas" id="escModo"></div>
+  </div>
+
+  <div class="bloco">
+    <h2>Os jogadores</h2>
+    <div id="listaJogadores"></div>
+  </div>
+
+  <div class="bloco">
+    <h2>Regra da casa</h2>
+    <label class="opcao">
+      <input type="checkbox" id="optCoroar" checked>
+      <span>Pergunta para coroar
+        <small>Ao chegar na última fileira, a pedra só vira dama se você acertar uma pergunta bíblica. Errando, ela fica lá como pedra comum e você pode tentar de novo nas próximas jogadas.</small>
+      </span>
+    </label>
+  </div>
+
+  <button class="principal" id="btnComecar">Começar</button>
+</section>
+
+<!-- ============ JOGO ============ -->
+<section class="tela" id="telaJogo">
+  <div class="placar">
+    <div class="lado" id="ladoX"><span class="quem">—</span><span class="pontos">12</span><span class="damas"></span></div>
+    <div class="meio" id="meioPlacar">—</div>
+    <div class="lado" id="ladoO"><span class="quem">—</span><span class="pontos">12</span><span class="damas"></span></div>
+  </div>
+
+  <div class="arena">
+    <div class="tabuleiro" id="tabuleiro"></div>
+  </div>
+
+  <p class="aviso" id="aviso">—</p>
+  <div class="desfecho" id="desfecho"></div>
+  <button class="secundario" id="btnSair">Encerrar e voltar</button>
+</section>
+
+<!-- ============ FIM ============ -->
+<section class="tela" id="telaFim">
+  <div class="fim">
+    <h2 id="fimTitulo">—</h2>
+    <p class="legenda" id="fimSub">—</p>
+    <button class="principal" id="btnDeNovo">Jogar de novo</button>
+    <button class="secundario" id="btnVoltarPreparo">Mudar as opções</button>
+  </div>
+</section>
+
+</main>
+
+<script src="perguntas.js"></script>
+<script src="comum.js"></script>
+<script>
+"use strict";
+
+/* =========================================================
+   DAMAS — Arena da Palavra
+   Regras brasileiras: captura obrigatória pelo maior número,
+   dama de longo alcance, pedra come para trás.
+   Coroar exige acertar uma pergunta bíblica.
+   v1.0.0
+   ========================================================= */
+
+const VERSAO = "1.0.0";
+const N = 8;
+const DIRS = [[-1,-1],[-1,1],[1,-1],[1,1]];
+const SEM_PROGRESSO = 40;      // lances de dama sem captura até o empate
+
+const lin = p => Math.floor(p / N);
+const col = p => p % N;
+const dentro = (l, c) => l >= 0 && l < N && c >= 0 && c < N;
+const escura = p => (lin(p) + col(p)) % 2 === 1;
+const outra = c => c === "x" ? "o" : "x";
+
+const REGRAS = `
+  <h2>Como se joga</h2>
+
+  <h3>O objetivo</h3>
+  <p>Capturar todas as pedras do adversário, ou deixá-lo sem nenhuma jogada possível.</p>
+
+  <h3>O andar das pedras</h3>
+  <p>A pedra comum anda uma casa na diagonal, sempre para frente. Mas <b>captura para frente e para trás</b>, pulando por cima da pedra adversária e caindo na casa vazia logo atrás.</p>
+
+  <h3>Comer é obrigatório</h3>
+  <p>Havendo captura possível, você é obrigado a capturar. E mais: é obrigado a fazer a captura que come <b>o maior número de pedras</b>. O app já mostra apenas as jogadas permitidas.</p>
+
+  <h3>A dama</h3>
+  <p>A pedra que para na última fileira do adversário vira dama. A dama anda quantas casas quiser na diagonal, para qualquer lado, e captura à distância — pulando a pedra adversária e parando em qualquer casa livre depois dela.</p>
+  <p>Se uma pedra apenas passa pela última fileira no meio de uma sequência de capturas e continua andando, ela <b>não</b> vira dama. Só coroa quem para lá.</p>
+
+  <h3>A pergunta da coroa</h3>
+  <p>Com a regra da casa ligada, chegar na última fileira não basta: é preciso acertar uma pergunta bíblica para receber a coroa. Errando, a pedra fica lá parada como pedra comum — e no começo de cada uma das suas jogadas você recebe outra chance de coroá-la.</p>
+
+  <h3>Empate</h3>
+  <p>Se passarem quarenta lances sem nenhuma captura e sem nenhuma pedra comum andar, a partida está travada e termina empatada.</p>
+`;
+
+const VISAO = {1:{prof:1, acaso:0.5}, 2:{prof:4, acaso:0.08}, 3:{prof:8, acaso:0}};
+
+let cfg = {
+  modo:"maquina",
+  jogadores:[
+    {cor:"x", nome:"Você",    tipo:"humano",  nivel:2},
+    {cor:"o", nome:"Máquina", tipo:"maquina", nivel:2}
+  ]
+};
+let jogo = null;
+
+/* ---------------------------------------------------------
+   REGRAS PURAS
+   --------------------------------------------------------- */
+
+function tabuleiroInicial(){
+  const t = Array(N*N).fill(null);
+  for(let p = 0; p < N*N; p++){
+    if(!escura(p)) continue;
+    if(lin(p) <= 2) t[p] = {c:"o", dama:false};
+    if(lin(p) >= 5) t[p] = {c:"x", dama:false};
+  }
+  return t;
+}
+
+function buscarCapturas(tab, p, pc, comidas, caminho, saida){
+  const origem = caminho[0];
+  const livre = q => !tab[q] || q === origem;
+  let achou = false;
+
+  for(const [dl, dc] of DIRS){
+    let l = lin(p) + dl, c = col(p) + dc;
+    if(pc.dama){
+      while(dentro(l,c) && livre(l*N + c)){ l += dl; c += dc; }
+    }
+    if(!dentro(l,c)) continue;
+    const alvo = l*N + c;
+    const vitima = tab[alvo];
+    if(!vitima || vitima.c === pc.c || comidas.includes(alvo)) continue;
+
+    let ll = l + dl, cc = c + dc;
+    while(dentro(ll,cc)){
+      const pouso = ll*N + cc;
+      if(!livre(pouso)) break;
+      achou = true;
+      buscarCapturas(tab, pouso, pc, comidas.concat([alvo]), caminho.concat([pouso]), saida);
+      if(!pc.dama) break;
+      ll += dl; cc += dc;
+    }
+  }
+
+  if(!achou && comidas.length) saida.push({caminho, comidas});
+}
+
+function movimentos(tab, cor){
+  const capturas = [];
+  for(let p = 0; p < N*N; p++){
+    const pc = tab[p];
+    if(!pc || pc.c !== cor) continue;
+    buscarCapturas(tab, p, pc, [], [p], capturas);
+  }
+  if(capturas.length){
+    const maior = Math.max(...capturas.map(s => s.comidas.length));
+    return capturas.filter(s => s.comidas.length === maior);
+  }
+
+  const simples = [];
+  for(let p = 0; p < N*N; p++){
+    const pc = tab[p];
+    if(!pc || pc.c !== cor) continue;
+    const dirs = pc.dama ? DIRS : (cor === "x" ? [[-1,-1],[-1,1]] : [[1,-1],[1,1]]);
+    for(const [dl, dc] of dirs){
+      let l = lin(p) + dl, c = col(p) + dc;
+      while(dentro(l,c)){
+        const q = l*N + c;
+        if(tab[q]) break;
+        simples.push({caminho:[p, q], comidas:[]});
+        if(!pc.dama) break;
+        l += dl; c += dc;
+      }
+    }
+  }
+  return simples;
+}
+
+function aplicar(tab, mov, cor, permitirCoroa){
+  const novo = tab.map(x => x ? {c:x.c, dama:x.dama} : null);
+  const de = mov.caminho[0], para = mov.caminho[mov.caminho.length - 1];
+  const pc = novo[de];
+  novo[de] = null;
+  mov.comidas.forEach(q => novo[q] = null);
+  const fileira = cor === "x" ? 0 : N - 1;
+  const coroa = !pc.dama && lin(para) === fileira;
+  novo[para] = {c:pc.c, dama: pc.dama || (coroa && permitirCoroa !== false)};
+  return {tab:novo, coroa, para};
+}
+
+function contar(tab, cor){
+  let pedras = 0, damas = 0;
+  tab.forEach(x => { if(x && x.c === cor){ pedras++; if(x.dama) damas++; } });
+  return {pedras, damas};
+}
+
+function pedraNaCoroacao(tab, cor){
+  const fileira = cor === "x" ? 0 : N - 1;
+  for(let p = 0; p < N*N; p++){
+    const pc = tab[p];
+    if(pc && pc.c === cor && !pc.dama && lin(p) === fileira) return p;
+  }
+  return -1;
+}
+
+/* ---------------------------------------------------------
+   PREPARO
+   --------------------------------------------------------- */
+
+function montarPreparo(){
+  UI.escolhas($("#escModo"),
+    [{valor:"maquina", rotulo:"Contra a máquina"}, {valor:"dupla", rotulo:"Dois no aparelho"}],
+    cfg.modo, v => {
+      cfg.modo = v;
+      cfg.jogadores[1].tipo = (v === "maquina") ? "maquina" : "humano";
+      if(v === "maquina" && cfg.jogadores[1].nome === "Jogador 2") cfg.jogadores[1].nome = "Máquina";
+      if(v === "dupla"   && cfg.jogadores[1].nome === "Máquina")   cfg.jogadores[1].nome = "Jogador 2";
+      montarPreparo();
+    });
+
+  const lista = $("#listaJogadores");
+  lista.innerHTML = "";
+  cfg.jogadores.forEach(j => {
+    const linha = document.createElement("div");
+    linha.className = "jogador-linha";
+    const bola = document.createElement("span");
+    bola.className = "bolinha";
+    bola.style.background = j.cor === "x" ? "var(--carmim-claro)" : "var(--gold)";
+    const nome = document.createElement("input");
+    nome.type = "text"; nome.value = j.nome; nome.maxLength = 16;
+    nome.setAttribute("aria-label", "Nome do jogador");
+    nome.addEventListener("input", () => { j.nome = nome.value.trim() || "Jogador"; });
+    const nivel = document.createElement("select");
+    nivel.setAttribute("aria-label", "Nível");
+    [[1,"Fácil"],[2,"Médio"],[3,"Difícil"]].forEach(([v,t]) => {
+      const o = document.createElement("option"); o.value = v; o.textContent = t;
+      if(v === j.nivel) o.selected = true; nivel.appendChild(o);
+    });
+    nivel.addEventListener("change", () => { j.nivel = Number(nivel.value); });
+    linha.append(bola, nome, nivel);
+    lista.appendChild(linha);
+  });
+}
+
+/* ---------------------------------------------------------
+   PARTIDA
+   --------------------------------------------------------- */
+
+function comecar(){
+  cfg.coroar = $("#optCoroar").checked;
+  Banco.zerar();
+  jogo = {
+    tab: tabuleiroInicial(),
+    vez: "x",
+    fase: "jogar",
+    escolhida: null,
+    prefixo: [],
+    semProgresso: 0,
+    coroaOferecida: false
+  };
+  UI.trocarTela("telaJogo");
+  $("#desfecho").innerHTML = "";
+  montarTabuleiro();
+  seguirVez();
+}
+
+function jogadorDe(c){ return cfg.jogadores.find(j => j.cor === c); }
+
+function montarTabuleiro(){
+  const t = $("#tabuleiro");
+  t.innerHTML = "";
+  for(let p = 0; p < N*N; p++){
+    const b = document.createElement("button");
+    b.className = "casa " + (escura(p) ? "escura" : "clara");
+    b.dataset.p = p;
+    b.setAttribute("aria-label", String.fromCharCode(97 + col(p)) + (N - lin(p)));
+    b.addEventListener("click", () => tocar(p));
+    t.appendChild(b);
+  }
+  redesenhar();
+}
+
+function redesenhar(){
+  const casas = $$("#tabuleiro .casa");
+  const j = jogadorDe(jogo.vez);
+  const meu = jogo.fase === "jogar" && j.tipo === "humano";
+  const movs = meu ? movimentos(jogo.tab, jogo.vez) : [];
+
+  // com um prefixo escolhido, só interessam as sequências que começam por ele
+  const compativeis = movs.filter(m =>
+    jogo.prefixo.every((q, i) => m.caminho[i] === q));
+  const proximos = jogo.prefixo.length
+    ? [...new Set(compativeis.map(m => m.caminho[jogo.prefixo.length]).filter(x => x !== undefined))]
+    : [];
+  const origens = [...new Set(movs.map(m => m.caminho[0]))];
+  const comendo = compativeis.some(m => m.comidas.length);
+
+  casas.forEach((b, p) => {
+    b.innerHTML = "";
+    b.classList.remove("destino", "comendo");
+    b.disabled = true;
+
+    const pc = jogo.tab[p];
+    if(pc){
+      const d = document.createElement("span");
+      d.className = "pedra " + pc.c + (pc.dama ? " dama" : "");
+      if(meu && !jogo.prefixo.length && origens.includes(p)) d.classList.add("movivel");
+      if(jogo.prefixo.length && jogo.prefixo[0] === p) d.classList.add("escolhida");
+      // pedras que serão comidas nesta sequência
+      if(jogo.prefixo.length && compativeis.some(m =>
+           m.comidas.slice(0, jogo.prefixo.length - 1).includes(p))) d.classList.add("condenada");
+      b.appendChild(d);
+      if(meu && !jogo.prefixo.length && origens.includes(p)) b.disabled = false;
+      if(meu && jogo.prefixo.length && jogo.prefixo[0] === p) b.disabled = false;
+    }
+
+    if(proximos.includes(p)){
+      b.classList.add("destino");
+      if(comendo) b.classList.add("comendo");
+      b.disabled = false;
+    }
+  });
+
+  atualizarPlacar();
+}
+
+function atualizarPlacar(){
+  ["x","o"].forEach(cor => {
+    const lado = $(cor === "x" ? "#ladoX" : "#ladoO");
+    lado.style.setProperty("--cor-lado", cor === "x" ? "var(--carmim-claro)" : "var(--gold-soft)");
+    $(".quem", lado).textContent = jogadorDe(cor).nome;
+    const c = contar(jogo.tab, cor);
+    $(".pontos", lado).textContent = c.pedras;
+    $(".damas", lado).textContent = c.damas
+      ? (c.damas === 1 ? "1 dama" : c.damas + " damas") : "";
+    lado.classList.toggle("vez", jogo.vez === cor && jogo.fase !== "fim");
+  });
+  $("#meioPlacar").innerHTML = jogo.semProgresso >= SEM_PROGRESSO - 10
+    ? "empate em<br>" + (SEM_PROGRESSO - jogo.semProgresso)
+    : "pedras<br>na mesa";
+}
+
+function avisar(t){ $("#aviso").textContent = t || ""; }
+
+/* ---------- vez ---------- */
+
+function seguirVez(){
+  if(jogo.fase === "fim") return;
+  jogo.fase = "jogar";
+  jogo.prefixo = [];
+  const j = jogadorDe(jogo.vez);
+
+  if(contar(jogo.tab, jogo.vez).pedras === 0)
+    return fimDaPartida(outra(jogo.vez), "ficou sem pedras");
+  if(movimentos(jogo.tab, jogo.vez).length === 0)
+    return fimDaPartida(outra(jogo.vez), "ficou sem jogada possível");
+  if(jogo.semProgresso >= SEM_PROGRESSO)
+    return fimDaPartida(null, "quarenta lances sem captura");
+
+  // uma pedra parada na última fileira ganha nova chance de coroar
+  const esperando = cfg.coroar ? pedraNaCoroacao(jogo.tab, jogo.vez) : -1;
+  if(esperando >= 0 && !jogo.coroaOferecida){
+    jogo.coroaOferecida = true;
+    return pedirCoroa(esperando, () => seguirVez());
+  }
+  jogo.coroaOferecida = false;
+
+  redesenhar();
+  if(j.tipo === "maquina"){
+    avisar(j.nome + " está pensando…");
+    setTimeout(jogadaDaMaquina, 650);
+  } else {
+    const movs = movimentos(jogo.tab, jogo.vez);
+    avisar(movs.some(m => m.comidas.length)
+      ? j.nome + ", há captura obrigatória — só as maiores estão liberadas."
+      : j.nome + ", escolha uma pedra.");
+  }
+}
+
+function pedirCoroa(posicao, aoFim){
+  const j = jogadorDe(jogo.vez);
+  jogo.fase = "respondendo";
+  redesenhar();
+
+  const coroar = () => {
+    jogo.tab[posicao] = {c:jogo.vez, dama:true};
+    Som.chegou();
+    avisar(j.nome + " coroou uma dama!");
+    redesenhar();
+  };
+
+  if(j.tipo === "maquina"){
+    const acertou = Math.random() < ACERTO_MAQUINA[j.nivel];
+    return setTimeout(() => {
+      if(acertou){ Som.acerto(); coroar(); }
+      else { Som.erro(); avisar(j.nome + " chegou à última fileira mas errou a pergunta."); }
+      setTimeout(aoFim, 900);
+    }, 700);
+  }
+
+  Pergunta.abrir({
+    para: j.nome,
+    nivel: j.nivel,
+    texto: a => a ? "Certa. A pedra recebe a coroa." : "Errada. A pedra fica onde está, sem coroa.",
+    aoResponder: (acertou) => {
+      if(acertou) coroar();
+      else { avisar("A coroa fica para a próxima."); }
+      setTimeout(aoFim, 700);
+    }
+  });
+}
+
+/* ---------- jogadas ---------- */
+
+function tocar(p){
+  if(jogo.fase !== "jogar") return;
+  if(jogadorDe(jogo.vez).tipo !== "humano") return;
+
+  const movs = movimentos(jogo.tab, jogo.vez);
+
+  if(!jogo.prefixo.length){
+    if(!movs.some(m => m.caminho[0] === p)) return;
+    jogo.prefixo = [p];
+    Som.toque();
+    return redesenhar();
+  }
+
+  if(p === jogo.prefixo[0] && jogo.prefixo.length === 1){
+    jogo.prefixo = [];
+    Som.toque();
+    return redesenhar();
+  }
+
+  const novo = jogo.prefixo.concat([p]);
+  const compativeis = movs.filter(m => novo.every((q, i) => m.caminho[i] === q));
+  if(!compativeis.length) return;
+
+  jogo.prefixo = novo;
+  Som.marcar();
+
+  const pronta = compativeis.find(m => m.caminho.length === novo.length);
+  if(pronta && !compativeis.some(m => m.caminho.length > novo.length))
+    return executar(pronta);
+
+  redesenhar();
+  avisar("A captura continua. Toque na próxima casa.");
+}
+
+function executar(mov){
+  jogo.fase = "movendo";
+  const cor = jogo.vez;
+  const eraComum = !jogo.tab[mov.caminho[0]].dama;
+  const r = aplicar(jogo.tab, mov, cor, !cfg.coroar);
+  jogo.tab = r.tab;
+  jogo.prefixo = [];
+
+  if(mov.comidas.length || eraComum) jogo.semProgresso = 0;
+  else jogo.semProgresso++;
+
+  Som.marcar();
+  if(mov.comidas.length){
+    Som.comeu();
+    avisar(jogadorDe(cor).nome + " comeu " +
+      mov.comidas.length + (mov.comidas.length === 1 ? " pedra." : " pedras."));
+  } else avisar("");
+  redesenhar();
+
+  if(r.coroa && cfg.coroar){
+    jogo.coroaOferecida = true;
+    return setTimeout(() => pedirCoroa(r.para, passarVez), 700);
+  }
+  if(r.coroa){
+    Som.chegou();
+    avisar(jogadorDe(cor).nome + " coroou uma dama!");
+  }
+  setTimeout(passarVez, 750);
+}
+
+function passarVez(){
+  if(jogo.fase === "fim") return;
+  jogo.vez = outra(jogo.vez);
+  jogo.coroaOferecida = false;
+  seguirVez();
+}
+
+/* ---------------------------------------------------------
+   A MÁQUINA
+   --------------------------------------------------------- */
+
+function avaliar(tab, eu){
+  const ele = outra(eu);
+  let nota = 0;
+  for(let p = 0; p < N*N; p++){
+    const pc = tab[p];
+    if(!pc) continue;
+    const meu = pc.c === eu;
+    let v = pc.dama ? 34 : 10;
+    if(!pc.dama){
+      // pedra adiantada vale mais; a última fileira própria segura o fundo
+      const avanco = pc.c === "x" ? (N - 1 - lin(p)) : lin(p);
+      v += avanco * 0.8;
+      if((pc.c === "x" && lin(p) === N-1) || (pc.c === "o" && lin(p) === 0)) v += 1.5;
+    }
+    if(col(p) > 0 && col(p) < N-1) v += 0.4; else v += 0.9;   // beira é segura
+    nota += meu ? v : -v;
+  }
+  return nota;
+}
+
+function buscar(tab, prof, alfa, beta, daVez, eu){
+  const movs = movimentos(tab, daVez);
+  if(movs.length === 0) return daVez === eu ? -50000 + prof : 50000 - prof;
+  if(prof === 0) return avaliar(tab, eu);
+
+  // capturas primeiro: melhora o corte alfa-beta
+  movs.sort((a,b) => b.comidas.length - a.comidas.length);
+  const maximiza = daVez === eu;
+  let melhor = maximiza ? -Infinity : Infinity;
+
+  for(const m of movs){
+    const filho = aplicar(tab, m, daVez).tab;
+    const n = buscar(filho, prof - 1, alfa, beta, outra(daVez), eu);
+    if(maximiza){ melhor = Math.max(melhor, n); alfa = Math.max(alfa, melhor); }
+    else        { melhor = Math.min(melhor, n); beta  = Math.min(beta,  melhor); }
+    if(alfa >= beta) break;
+  }
+  return melhor;
+}
+
+function jogadaDaMaquina(){
+  const j = jogadorDe(jogo.vez);
+  const movs = movimentos(jogo.tab, jogo.vez);
+  if(movs.length === 0) return seguirVez();
+
+  let escolha;
+  if(Math.random() < VISAO[j.nivel].acaso){
+    escolha = movs[Math.floor(Math.random() * movs.length)];
+  } else {
+    movs.sort((a,b) => b.comidas.length - a.comidas.length);
+    let melhor = -Infinity;
+    escolha = movs[0];
+    for(const m of movs){
+      const filho = aplicar(jogo.tab, m, jogo.vez).tab;
+      const n = buscar(filho, VISAO[j.nivel].prof - 1, -Infinity, Infinity, outra(jogo.vez), jogo.vez);
+      if(n > melhor){ melhor = n; escolha = m; }
+    }
+  }
+  jogo.fase = "jogar";
+  executar(escolha);
+}
+
+/* ---------------------------------------------------------
+   FIM
+   --------------------------------------------------------- */
+
+function fimDaPartida(cor, motivo){
+  jogo.fase = "fim";
+  redesenhar();
+  if(cor === null){
+    Som.empate();
+    $("#fimTitulo").textContent = "Empate";
+    $("#fimSub").textContent = "A partida travou: " + motivo + ".";
+  } else {
+    Som.vitoria();
+    $("#fimTitulo").textContent = jogadorDe(cor).nome + " venceu";
+    $("#fimSub").textContent = jogadorDe(outra(cor)).nome + " " + motivo + ".";
+  }
+  UI.trocarTela("telaFim");
+}
+
+/* ---------------------------------------------------------
+   LIGAÇÕES
+   --------------------------------------------------------- */
+
+UI.iniciar({ titulo:"Damas", versao:VERSAO, regras:REGRAS, voltar:"index.html" });
+
+$("#btnComecar").addEventListener("click", comecar);
+$("#btnSair").addEventListener("click", () => UI.trocarTela("telaPreparo"));
+$("#btnDeNovo").addEventListener("click", comecar);
+$("#btnVoltarPreparo").addEventListener("click", () => UI.trocarTela("telaPreparo"));
+
+montarPreparo();
+</script>
+</body>
+</html>
