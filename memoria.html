@@ -36,10 +36,12 @@
 .faixa .lado.vez .quem{color:var(--cor-lado)}
 .faixa .lado .pontos{font-size:23px;line-height:1;font-family:'Cinzel',serif;color:var(--cor-lado);font-variant-numeric:tabular-nums}
 
-.mesa{display:grid;gap:7px;max-width:430px;margin:0 auto}
-.mesa.c2{grid-template-columns:repeat(2,1fr)}
-.mesa.c3{grid-template-columns:repeat(3,1fr)}
-.mesa.c4{grid-template-columns:repeat(4,1fr)}
+/* A largura máxima muda com o número de colunas: sem isso, uma mesa de
+   2 colunas gera cartas gigantes com um texto minúsculo no meio. */
+.mesa{display:grid;gap:7px;margin:0 auto}
+.mesa.c2{grid-template-columns:repeat(2,1fr);max-width:300px}
+.mesa.c3{grid-template-columns:repeat(3,1fr);max-width:390px}
+.mesa.c4{grid-template-columns:repeat(4,1fr);max-width:445px}
 @media (max-width:360px){ .mesa{gap:5px} }
 
 /* A carta é um div, e não um button: dentro de um botão a altura
@@ -48,7 +50,7 @@
    A folha também não usa altura percentual: ela é item de grade,
    e item de grade já se estica sozinho para preencher a área. */
 .carta{
-  aspect-ratio:3/4;background:none;border:none;padding:0;
+  aspect-ratio:4/5;background:none;border:none;padding:0;
   display:grid;perspective:700px;cursor:pointer;
   -webkit-tap-highlight-color:transparent;
 }
@@ -68,7 +70,7 @@
   color:var(--gold);opacity:.9;
 }
 .verso i{
-  display:block;width:34%;aspect-ratio:1;
+  display:block;width:28%;aspect-ratio:1;
   border:1.5px solid var(--gold);opacity:.75;
   transform:rotate(45deg);border-radius:3px;
 }
@@ -80,11 +82,19 @@
 }
 .frente.pergunta{color:var(--ink)}
 .frente.resposta{color:var(--gold-soft);font-family:'Cinzel',serif}
-.t1{font-size:14px}
-.t2{font-size:12px}
-.t3{font-size:10.5px}
-.t4{font-size:9px}
-@media (max-width:360px){ .t1{font-size:12.5px} .t2{font-size:11px} .t3{font-size:9.5px} .t4{font-size:8.5px} }
+.t1{font-size:17px}
+.t2{font-size:14.5px}
+.t3{font-size:12.5px}
+.t4{font-size:11px}
+.mesa.c4 .t1{font-size:15px}
+.mesa.c4 .t2{font-size:13px}
+.mesa.c4 .t3{font-size:11px}
+.mesa.c4 .t4{font-size:9.5px}
+@media (max-width:360px){
+  .t1{font-size:15px} .t2{font-size:13px} .t3{font-size:11px} .t4{font-size:10px}
+  .mesa.c4 .t1{font-size:13px} .mesa.c4 .t2{font-size:11.5px}
+  .mesa.c4 .t3{font-size:10px} .mesa.c4 .t4{font-size:9px}
+}
 
 .carta.achada .frente{
   border-color:var(--esmeralda);
@@ -169,7 +179,7 @@
    v1.0.0
    ========================================================= */
 
-const VERSAO = "1.0.1";
+const VERSAO = "1.1.1";
 
 /* Mesa maior exige pergunta mais curta, senão o texto não cabe na carta. */
 const MESAS = {
@@ -177,6 +187,25 @@ const MESAS = {
   media:   {pares:6,  colunas:3, limite:55, rotulo:"12 cartas"},
   grande:  {pares:8,  colunas:4, limite:45, rotulo:"16 cartas"}
 };
+
+/* De que tipo é a resposta. Sortear pares do mesmo tipo obriga a saber
+   qual resposta vai com qual pergunta — não basta lembrar onde ela está. */
+function tipoDaResposta(q){
+  const k = q.p.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
+  const r = q.o[q.c];
+  if(/^\s*\d/.test(r) || /^(quantos|quantas|com quantos|por quantos|quanto)/.test(k)) return "numero";
+  if(/\btribo\b/.test(k)) return "tribo";
+  if(/(qual|que) (livro|carta|epistola)|em qual (livro|carta)/.test(k)) return "livro";
+  if(/(qual|que) profeta/.test(k)) return "profeta";
+  if(/(qual|que) rei|qual governador/.test(k)) return "rei";
+  if(/(qual|que) juiz/.test(k)) return "juiz";
+  if(/\b(cidade|local|lugar|terra|regiao|monte|ilha|rio)\b/.test(k)) return "lugar";
+  if(/qual animal|qual ave|quais aves|quais animais/.test(k)) return "animal";
+  if(/ocupacao|profissao|oficio/.test(k)) return "ocupacao";
+  if(/qual mulher|quem foi a mulher|qual (irma|esposa|mae|profetisa|nora)|quem foi a (mae|avo|bisavo)/.test(k)) return "mulher";
+  if(/^(o que|com que|de que (madeira|material))/.test(k)) return "objeto";
+  return "pessoa";
+}
 
 /* o quanto a máquina se lembra das cartas que já viu */
 const MEMORIA_MAQUINA = {1:0.35, 2:0.65, 3:0.92};
@@ -194,6 +223,9 @@ const REGRAS = `
 
   <h3>Por que este é diferente dos outros</h3>
   <p>Nos outros jogos da Arena a pergunta interrompe a jogada. Aqui ela é o tabuleiro inteiro — você aprende olhando, sem parar para responder nada.</p>
+
+  <h3>Do médio para cima, todas as respostas são do mesmo tipo</h3>
+  <p>Numa mesa misturada dá para ligar a resposta à pergunta só pela categoria: se só há um nome de pessoa, ele responde à única pergunta sobre gente. A partir do nível médio, as respostas da mesa são todas do mesmo tipo — só reis, só cidades, só profetas. Aí lembrar onde a carta está não basta: é preciso saber qual vai com qual.</p>
 
   <h3>O tamanho da mesa</h3>
   <p>Mesa pequena tem 8 cartas e cabe pergunta comprida. Mesa grande tem 16 e só entram perguntas curtas, senão o texto não cabe na carta.</p>
@@ -301,9 +333,41 @@ function sortearPares(){
   let pool = PERGUNTAS.filter(q => q.n === nivel && serve(q));
   if(pool.length < m.pares) pool = PERGUNTAS.filter(serve);
 
-  return embaralhar(pool.slice())
-    .slice(0, m.pares)
-    .map((q, i) => ({par:i, pergunta:q.p, resposta:q.o[q.c], ref:q.r}));
+  /* Duas cartas de resposta com o mesmo texto tornam o par ambíguo:
+     "Patmos" respondendo a duas perguntas diferentes na mesma mesa
+     deixa o jogo sem solução. Esta peneira escolhe respeitando isso. */
+  const semRepetir = (lista, quantas) => {
+    const chave = t => t.normalize("NFD").replace(/[\u0300-\u036f]/g,"")
+                        .toLowerCase().replace(/[^a-z0-9 ]/g,"").trim();
+    const fora = [], usadas = [], perguntas = [];
+    for(const q of lista){
+      if(fora.length === quantas) break;
+      const r = chave(q.o[q.c]), p = chave(q.p);
+      if(usadas.some(u => u === r || u.includes(r) || r.includes(u))) continue;
+      if(perguntas.some(u => u === p)) continue;
+      usadas.push(r); perguntas.push(p); fora.push(q);
+    }
+    return fora.length === quantas ? fora : null;
+  };
+
+  let escolhidas = null;
+
+  // do médio para cima, tenta uma mesa inteira do mesmo tipo de resposta:
+  // aí não adianta lembrar onde a carta está, é preciso saber qual é qual
+  if(nivel >= 2){
+    const porTipo = {};
+    pool.forEach(q => { const t = tipoDaResposta(q); (porTipo[t] = porTipo[t] || []).push(q); });
+    const cheios = embaralhar(Object.keys(porTipo).filter(t => porTipo[t].length >= m.pares));
+    for(const t of cheios){
+      escolhidas = semRepetir(embaralhar(porTipo[t].slice()), m.pares);
+      if(escolhidas) break;
+    }
+  }
+  if(!escolhidas) escolhidas = semRepetir(embaralhar(pool.slice()), m.pares);
+  if(!escolhidas) escolhidas = semRepetir(embaralhar(PERGUNTAS.slice()), m.pares);
+  if(!escolhidas) escolhidas = embaralhar(pool.slice()).slice(0, m.pares);
+
+  return escolhidas.map((q, i) => ({par:i, pergunta:q.p, resposta:q.o[q.c], ref:q.r}));
 }
 
 function comecar(){
