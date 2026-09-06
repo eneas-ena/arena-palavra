@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0F1B33">
+<title>Lig 4 — Arena da Palavra</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="32x32" href="icone-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icone-192.png">
+<link rel="apple-touch-icon" href="icone-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Arena da Palavra">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="comum.css">
+<style>
+/* ---------- placar ---------- */
+.placar{display:flex;align-items:stretch;gap:10px;margin-bottom:14px}
+.placar .lado{
+  flex:1;text-align:center;padding:11px 8px;border-radius:10px;
+  background:var(--surface);border:1px solid var(--linha);
+  transition:border-color .2s, background .2s;
+}
+.placar .lado.vez{border-color:var(--cor-lado);background:color-mix(in srgb, var(--cor-lado) 14%, var(--surface))}
+.placar .lado .quem{
+  display:block;font-family:'Cinzel',serif;font-size:13px;color:var(--ink-dim);
+  margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.placar .lado.vez .quem{color:var(--cor-lado)}
+.placar .lado .pontos{font-size:29px;line-height:1;font-family:'Cinzel',serif;color:var(--cor-lado);font-variant-numeric:tabular-nums}
+.placar .meio{align-self:center;font-size:13px;color:var(--ink-dim);text-align:center;min-width:58px;line-height:1.25}
+
+/* ---------- tabuleiro ---------- */
+.arena{width:100%;max-width:400px;margin:0 auto}
+.setas{display:grid;grid-template-columns:repeat(7,1fr);gap:2%;margin-bottom:5px}
+.seta{
+  padding:4px 0;text-align:center;font-size:15px;color:var(--gold);
+  opacity:0;transition:opacity .15s;
+}
+.coluna.podendo:hover ~ .setas .seta{opacity:0}
+
+.painel{
+  display:grid;grid-template-columns:repeat(7,1fr);gap:2%;
+  background:var(--surface);border:1px solid var(--linha);
+  border-radius:12px;padding:2%;position:relative;
+}
+.coluna{
+  display:grid;grid-template-rows:repeat(6,1fr);gap:6%;
+  background:none;border:none;padding:0;border-radius:8px;
+  -webkit-tap-highlight-color:transparent;
+}
+.coluna.livre:hover,.coluna.livre:focus-visible{background:rgba(201,162,39,.10)}
+.coluna:disabled{cursor:default}
+.furo{
+  width:100%;aspect-ratio:1;border-radius:50%;
+  background:var(--bg);box-shadow:inset 0 2px 5px rgba(0,0,0,.5);
+  display:grid;place-items:center;
+}
+[data-tema="claro"] .furo{background:#DCD4C2;box-shadow:inset 0 2px 4px rgba(0,0,0,.18)}
+
+.disco{
+  width:88%;height:88%;border-radius:50%;
+  box-shadow:inset 0 -3px 5px rgba(0,0,0,.35), inset 0 3px 5px rgba(255,255,255,.35);
+  animation:cair .4s cubic-bezier(.45,0,.75,1);
+}
+@keyframes cair{from{transform:translateY(var(--de,-600%))}}
+.disco.venceu{
+  animation:brilha 1s ease-in-out infinite;
+  box-shadow:0 0 0 3px var(--ink), inset 0 -3px 5px rgba(0,0,0,.35);
+}
+@keyframes brilha{50%{box-shadow:0 0 0 4px var(--ink), 0 0 14px var(--ink)}}
+.disco.x{background:var(--carmim-claro)}
+.disco.o{background:var(--gold-soft)}
+@media (prefers-reduced-motion:reduce){.disco,.disco.venceu{animation:none}}
+
+.coluna.alvo{background:rgba(201,162,39,.20)}
+
+.resultado-rodada{text-align:center;margin-top:16px;min-height:52px}
+.resultado-rodada .frase{font-family:'Cinzel',serif;font-size:18px;margin:0 0 10px}
+.resultado-rodada .frase.venceu{color:var(--gold)}
+</style>
+</head>
+<body>
+
+<header></header>
+
+<main>
+
+<!-- ============ PREPARO ============ -->
+<section class="tela ativa" id="telaPreparo">
+  <div class="bloco">
+    <h2>Quem joga</h2>
+    <div class="escolhas" id="escModo"></div>
+  </div>
+
+  <div class="bloco">
+    <h2>Os jogadores</h2>
+    <div id="listaJogadores"></div>
+  </div>
+
+  <div class="bloco">
+    <h2>A partida</h2>
+    <div class="escolhas" id="escRodadas"></div>
+    <p class="legenda" style="margin:14px 0 0" id="legendaRodadas">—</p>
+  </div>
+
+  <button class="principal" id="btnComecar">Começar</button>
+</section>
+
+<!-- ============ JOGO ============ -->
+<section class="tela" id="telaJogo">
+  <div class="placar">
+    <div class="lado" id="ladoX"><span class="quem">—</span><span class="pontos">0</span></div>
+    <div class="meio" id="meioPlacar">—</div>
+    <div class="lado" id="ladoO"><span class="quem">—</span><span class="pontos">0</span></div>
+  </div>
+
+  <div class="arena">
+    <div class="painel" id="painel"></div>
+  </div>
+
+  <p class="aviso" id="aviso">—</p>
+  <div class="resultado-rodada" id="resultadoRodada"></div>
+  <button class="secundario" id="btnSair">Encerrar e voltar</button>
+</section>
+
+<!-- ============ FIM ============ -->
+<section class="tela" id="telaFim">
+  <div class="fim">
+    <h2 id="fimTitulo">—</h2>
+    <p class="legenda" id="fimSub">—</p>
+    <ol class="placar-lista" id="placarFinal"></ol>
+    <button class="principal" id="btnDeNovo">Jogar de novo</button>
+    <button class="secundario" id="btnVoltarPreparo">Mudar as opções</button>
+  </div>
+</section>
+
+</main>
+
+<script src="perguntas.js"></script>
+<script src="comum.js"></script>
+<script>
+"use strict";
+
+/* =========================================================
+   LIG 4 — Arena da Palavra
+   Escolha a coluna, responda a pergunta, a peça cai.
+   v1.0.0
+   ========================================================= */
+
+const VERSAO = "1.0.0";
+const COLS = 7, LINS = 6;
+
+const REGRAS = `
+  <h2>Como se joga</h2>
+
+  <h3>O objetivo</h3>
+  <p>Alinhar quatro peças da sua cor: em pé, deitadas ou na diagonal.</p>
+
+  <h3>A jogada</h3>
+  <p>Toque na coluna onde quer soltar a peça. A pergunta bíblica aparece depois. Acertando, a peça cai e ocupa a casa mais baixa livre daquela coluna. Errando, nada cai e a vez passa.</p>
+  <p>Como na Velha, você escolhe a coluna antes de conhecer a pergunta.</p>
+
+  <h3>Por que a coluna do meio vale mais</h3>
+  <p>Uma peça no centro participa de muito mais combinações de quatro do que uma peça na borda. Vale disputar o meio desde o começo.</p>
+
+  <h3>A partida</h3>
+  <p>Vence quem chegar primeiro ao número de rodadas combinado. A cada rodada, quem começa é o outro.</p>
+
+  <h3>Os níveis</h3>
+  <p>O nível muda a dificuldade das suas perguntas e, contra a máquina, o quanto ela enxerga à frente: no fácil ela quase não pensa, no difícil ela calcula seis jogadas adiante.</p>
+`;
+
+/* profundidade da busca da máquina, por nível */
+const VISAO = {1:{prof:1, acaso:0.55}, 2:{prof:4, acaso:0.10}, 3:{prof:6, acaso:0}};
+
+let cfg = {
+  modo:"maquina",
+  alvo:3,
+  jogadores:[
+    {marca:"X", nome:"Você",    tipo:"humano",  nivel:2},
+    {marca:"O", nome:"Máquina", tipo:"maquina", nivel:2}
+  ]
+};
+let jogo = null;
+
+const idx = (l, c) => l * COLS + c;
+
+/* ---------------------------------------------------------
+   PREPARO
+   --------------------------------------------------------- */
+
+function montarPreparo(){
+  UI.escolhas($("#escModo"),
+    [{valor:"maquina", rotulo:"Contra a máquina"}, {valor:"dupla", rotulo:"Dois no aparelho"}],
+    cfg.modo, v => {
+      cfg.modo = v;
+      cfg.jogadores[1].tipo = (v === "maquina") ? "maquina" : "humano";
+      if(v === "maquina" && cfg.jogadores[1].nome === "Jogador 2") cfg.jogadores[1].nome = "Máquina";
+      if(v === "dupla"   && cfg.jogadores[1].nome === "Máquina")   cfg.jogadores[1].nome = "Jogador 2";
+      montarPreparo();
+    });
+
+  UI.escolhas($("#escRodadas"),
+    [{valor:1,rotulo:"1"},{valor:3,rotulo:"3"},{valor:5,rotulo:"5"}],
+    cfg.alvo, v => { cfg.alvo = v; montarPreparo(); });
+
+  $("#legendaRodadas").textContent = cfg.alvo === 1
+    ? "Uma rodada só decide tudo."
+    : "Vence quem ganhar " + cfg.alvo + " rodadas primeiro.";
+
+  const lista = $("#listaJogadores");
+  lista.innerHTML = "";
+  cfg.jogadores.forEach(j => {
+    const linha = document.createElement("div");
+    linha.className = "jogador-linha";
+
+    const bola = document.createElement("span");
+    bola.className = "bolinha";
+    bola.style.background = j.marca === "X" ? "var(--carmim-claro)" : "var(--gold)";
+
+    const nome = document.createElement("input");
+    nome.type = "text"; nome.value = j.nome; nome.maxLength = 16;
+    nome.setAttribute("aria-label", "Nome de quem joga com as peças " + (j.marca === "X" ? "vermelhas" : "douradas"));
+    nome.addEventListener("input", () => { j.nome = nome.value.trim() || ("Jogador " + j.marca); });
+
+    const nivel = document.createElement("select");
+    nivel.setAttribute("aria-label", "Nível");
+    [[1,"Fácil"],[2,"Médio"],[3,"Difícil"]].forEach(([v,t]) => {
+      const o = document.createElement("option"); o.value = v; o.textContent = t;
+      if(v === j.nivel) o.selected = true; nivel.appendChild(o);
+    });
+    nivel.addEventListener("change", () => { j.nivel = Number(nivel.value); });
+
+    linha.append(bola, nome, nivel);
+    lista.appendChild(linha);
+  });
+}
+
+/* ---------------------------------------------------------
+   PARTIDA
+   --------------------------------------------------------- */
+
+function comecar(){
+  Banco.zerar();
+  jogo = { pontos:{X:0,O:0}, rodada:1, comeca:"X", casas:null, vez:"X", fase:"parado", pendente:null };
+  UI.trocarTela("telaJogo");
+  montarPainel();
+  novaRodada();
+}
+
+function jogadorDe(m){ return cfg.jogadores.find(j => j.marca === m); }
+
+function montarPainel(){
+  const p = $("#painel");
+  p.innerHTML = "";
+  for(let c = 0; c < COLS; c++){
+    const col = document.createElement("button");
+    col.className = "coluna";
+    col.dataset.c = c;
+    col.setAttribute("aria-label", "Coluna " + (c+1));
+    for(let l = 0; l < LINS; l++){
+      const f = document.createElement("span");
+      f.className = "furo";
+      f.dataset.l = l; f.dataset.c = c;
+      col.appendChild(f);
+    }
+    col.addEventListener("click", () => escolherColuna(c));
+    p.appendChild(col);
+  }
+}
+
+function novaRodada(){
+  jogo.casas = Array(COLS * LINS).fill(null);
+  jogo.vez = jogo.comeca;
+  jogo.fase = "escolher";
+  jogo.pendente = null;
+  $$("#painel .furo").forEach(f => f.innerHTML = "");
+  $("#resultadoRodada").innerHTML = "";
+  atualizarPlacar();
+  seguirVez();
+}
+
+function atualizarPlacar(){
+  const lx = $("#ladoX"), lo = $("#ladoO");
+  lx.style.setProperty("--cor-lado", "var(--carmim-claro)");
+  lo.style.setProperty("--cor-lado", "var(--gold-soft)");
+  $(".quem", lx).textContent = jogadorDe("X").nome;
+  $(".quem", lo).textContent = jogadorDe("O").nome;
+  $(".pontos", lx).textContent = jogo.pontos.X;
+  $(".pontos", lo).textContent = jogo.pontos.O;
+  lx.classList.toggle("vez", jogo.vez === "X");
+  lo.classList.toggle("vez", jogo.vez === "O");
+  $("#meioPlacar").innerHTML = cfg.alvo === 1
+    ? "rodada<br>única"
+    : "rodada " + jogo.rodada + "<br>até " + cfg.alvo;
+}
+
+function seguirVez(){
+  atualizarPlacar();
+  const j = jogadorDe(jogo.vez);
+  if(j.tipo === "maquina"){
+    travar(true);
+    avisar(j.nome + " está pensando…");
+    setTimeout(jogadaDaMaquina, 700);
+  } else {
+    travar(false);
+    avisar(j.nome + ", escolha uma coluna.");
+  }
+}
+
+function travar(t){
+  $$("#painel .coluna").forEach((col, c) => {
+    const livre = alturaLivre(jogo.casas, c) >= 0;
+    col.disabled = t || !livre;
+    col.classList.toggle("livre", !t && livre);
+    col.classList.remove("alvo");
+  });
+}
+
+function avisar(t){ $("#aviso").textContent = t || ""; }
+
+/* a linha mais baixa livre de uma coluna, ou -1 se cheia */
+function alturaLivre(casas, c){
+  for(let l = LINS - 1; l >= 0; l--) if(casas[idx(l,c)] === null) return l;
+  return -1;
+}
+
+/* ---------- a jogada ---------- */
+
+function escolherColuna(c){
+  if(jogo.fase !== "escolher") return;
+  if(alturaLivre(jogo.casas, c) < 0) return;
+
+  jogo.fase = "respondendo";
+  jogo.pendente = c;
+  Som.toque();
+  $$("#painel .coluna")[c].classList.add("alvo");
+  travar(true);
+
+  const j = jogadorDe(jogo.vez);
+  Pergunta.abrir({
+    para: j.nome,
+    nivel: j.nivel,
+    texto: a => a ? "Resposta certa. A peça cai." : "Resposta errada. Nada cai e a vez passa.",
+    aoResponder: (acertou) => resolver(acertou)
+  });
+}
+
+function jogadaDaMaquina(){
+  const j = jogadorDe(jogo.vez);
+  const c = escolhaDaMaquina(j);
+  jogo.pendente = c;
+  $$("#painel .coluna")[c].classList.add("alvo");
+  Som.toque();
+
+  const acertou = Math.random() < ACERTO_MAQUINA[j.nivel];
+  setTimeout(() => {
+    if(acertou) Som.acerto(); else Som.erro();
+    avisar(j.nome + (acertou ? " acertou a pergunta." : " errou a pergunta."));
+    setTimeout(() => resolver(acertou), 850);
+  }, 500);
+}
+
+function resolver(acertou){
+  const c = jogo.pendente;
+  $$("#painel .coluna").forEach(col => col.classList.remove("alvo"));
+
+  if(acertou){
+    const l = alturaLivre(jogo.casas, c);
+    if(l >= 0){
+      jogo.casas[idx(l,c)] = jogo.vez;
+      soltarDisco(l, c, jogo.vez);
+      Som.marcar();
+    }
+  }
+
+  const venc = vencedor(jogo.casas);
+  if(venc) return setTimeout(() => fimDaRodada(venc.marca, venc.casas), 750);
+  if(jogo.casas.every(x => x !== null)) return setTimeout(() => fimDaRodada(null, null), 750);
+
+  jogo.vez = jogo.vez === "X" ? "O" : "X";
+  jogo.fase = "escolher";
+  setTimeout(seguirVez, 320);
+}
+
+function soltarDisco(l, c, marca){
+  const furo = $('#painel .furo[data-l="' + l + '"][data-c="' + c + '"]');
+  if(!furo) return;
+  const d = document.createElement("span");
+  d.className = "disco " + (marca === "X" ? "x" : "o");
+  d.style.setProperty("--de", (-(l + 1) * 106) + "%");
+  furo.innerHTML = "";
+  furo.appendChild(d);
+}
+
+/* ---------- quem venceu ---------- */
+
+const DIRECOES = [[0,1],[1,0],[1,1],[1,-1]];
+
+function vencedor(casas){
+  for(let l = 0; l < LINS; l++){
+    for(let c = 0; c < COLS; c++){
+      const m = casas[idx(l,c)];
+      if(!m) continue;
+      for(const [dl,dc] of DIRECOES){
+        const fim_l = l + 3*dl, fim_c = c + 3*dc;
+        if(fim_l < 0 || fim_l >= LINS || fim_c < 0 || fim_c >= COLS) continue;
+        let bate = true;
+        const grupo = [];
+        for(let k = 0; k < 4; k++){
+          const p = idx(l + k*dl, c + k*dc);
+          if(casas[p] !== m){ bate = false; break; }
+          grupo.push(p);
+        }
+        if(bate) return {marca:m, casas:grupo};
+      }
+    }
+  }
+  return null;
+}
+
+/* ---------- fim ---------- */
+
+function fimDaRodada(marca, casasVencedoras){
+  jogo.fase = "parado";
+  travar(true);
+  avisar("");
+
+  const cx = $("#resultadoRodada");
+  const frase = document.createElement("p");
+  frase.className = "frase";
+
+  if(marca){
+    casasVencedoras.forEach(p => {
+      const l = Math.floor(p / COLS), c = p % COLS;
+      const d = $('#painel .furo[data-l="' + l + '"][data-c="' + c + '"] .disco');
+      if(d) d.classList.add("venceu");
+    });
+    jogo.pontos[marca]++;
+    frase.textContent = jogadorDe(marca).nome + " ligou quatro";
+    frase.classList.add("venceu");
+    Som.chegou();
+  } else {
+    frase.textContent = "Painel cheio, ninguém ligou quatro";
+    Som.empate();
+  }
+
+  atualizarPlacar();
+  cx.appendChild(frase);
+
+  if(jogo.pontos.X >= cfg.alvo || jogo.pontos.O >= cfg.alvo)
+    return setTimeout(fimDaPartida, 1500);
+
+  const b = document.createElement("button");
+  b.className = "principal";
+  b.textContent = "Próxima rodada";
+  b.addEventListener("click", () => {
+    jogo.rodada++;
+    jogo.comeca = jogo.comeca === "X" ? "O" : "X";
+    novaRodada();
+  });
+  cx.appendChild(b);
+  b.focus();
+}
+
+function fimDaPartida(){
+  const m = jogo.pontos.X > jogo.pontos.O ? "X" : "O";
+  Som.vitoria();
+  $("#fimTitulo").textContent = jogadorDe(m).nome + " venceu";
+  $("#fimSub").textContent = jogo.pontos.X + " a " + jogo.pontos.O +
+    " em " + jogo.rodada + (jogo.rodada === 1 ? " rodada" : " rodadas");
+
+  const ol = $("#placarFinal");
+  ol.innerHTML = "";
+  ["X","O"].sort((a,b) => jogo.pontos[b] - jogo.pontos[a]).forEach(k => {
+    const li = document.createElement("li");
+    const bola = document.createElement("span");
+    bola.className = "bolinha";
+    bola.style.background = k === "X" ? "var(--carmim-claro)" : "var(--gold)";
+    const nome = document.createElement("span"); nome.textContent = jogadorDe(k).nome;
+    const pts = document.createElement("span");
+    pts.style.flex = "0"; pts.style.color = "var(--ink-dim)";
+    pts.textContent = jogo.pontos[k];
+    li.append(bola, nome, pts);
+    ol.appendChild(li);
+  });
+  UI.trocarTela("telaFim");
+}
+
+/* ---------------------------------------------------------
+   A MÁQUINA — busca com poda alfa-beta
+   --------------------------------------------------------- */
+
+function colunasLivres(casas){
+  const fora = [];
+  for(let c = 0; c < COLS; c++) if(alturaLivre(casas, c) >= 0) fora.push(c);
+  return fora;
+}
+
+function soltar(casas, c, marca){
+  const copia = casas.slice();
+  copia[idx(alturaLivre(casas, c), c)] = marca;
+  return copia;
+}
+
+/* vale mais o que está perto do centro e o que já tem trinca aberta */
+function avaliar(casas, eu){
+  const ele = eu === "X" ? "O" : "X";
+  let nota = 0;
+
+  for(let l = 0; l < LINS; l++)
+    if(casas[idx(l,3)] === eu) nota += 3;
+
+  const janelas = [];
+  for(let l = 0; l < LINS; l++)
+    for(let c = 0; c < COLS; c++)
+      for(const [dl,dc] of DIRECOES){
+        if(l + 3*dl < 0 || l + 3*dl >= LINS || c + 3*dc < 0 || c + 3*dc >= COLS) continue;
+        janelas.push([0,1,2,3].map(k => casas[idx(l + k*dl, c + k*dc)]));
+      }
+
+  for(const j of janelas){
+    const meus = j.filter(x => x === eu).length;
+    const dele = j.filter(x => x === ele).length;
+    const vazias = j.filter(x => x === null).length;
+    if(meus && dele) continue;
+    if(meus === 3 && vazias === 1) nota += 12;
+    else if(meus === 2 && vazias === 2) nota += 3;
+    if(dele === 3 && vazias === 1) nota -= 14;
+    else if(dele === 2 && vazias === 2) nota -= 3;
+  }
+  return nota;
+}
+
+function buscar(casas, prof, alfa, beta, daVez, eu){
+  const v = vencedor(casas);
+  if(v) return v.marca === eu ? 100000 - (10 - prof) : -100000 + (10 - prof);
+  const livres = colunasLivres(casas);
+  if(livres.length === 0) return 0;
+  if(prof === 0) return avaliar(casas, eu);
+
+  const ordem = livres.slice().sort((a,b) => Math.abs(3-a) - Math.abs(3-b));
+  const outro = daVez === "X" ? "O" : "X";
+
+  if(daVez === eu){
+    let melhor = -Infinity;
+    for(const c of ordem){
+      melhor = Math.max(melhor, buscar(soltar(casas,c,daVez), prof-1, alfa, beta, outro, eu));
+      alfa = Math.max(alfa, melhor);
+      if(alfa >= beta) break;
+    }
+    return melhor;
+  } else {
+    let pior = Infinity;
+    for(const c of ordem){
+      pior = Math.min(pior, buscar(soltar(casas,c,daVez), prof-1, alfa, beta, outro, eu));
+      beta = Math.min(beta, pior);
+      if(alfa >= beta) break;
+    }
+    return pior;
+  }
+}
+
+function escolhaDaMaquina(j){
+  const livres = colunasLivres(jogo.casas);
+  const cfgN = VISAO[j.nivel];
+  if(Math.random() < cfgN.acaso) return livres[Math.floor(Math.random() * livres.length)];
+
+  const eu = jogo.vez, outro = eu === "X" ? "O" : "X";
+  let melhor = -Infinity, escolha = livres[0];
+  const ordem = livres.slice().sort((a,b) => Math.abs(3-a) - Math.abs(3-b));
+
+  for(const c of ordem){
+    const nota = buscar(soltar(jogo.casas, c, eu), cfgN.prof - 1, -Infinity, Infinity, outro, eu);
+    if(nota > melhor){ melhor = nota; escolha = c; }
+  }
+  return escolha;
+}
+
+/* ---------------------------------------------------------
+   LIGAÇÕES
+   --------------------------------------------------------- */
+
+UI.iniciar({ titulo:"Lig 4", versao:VERSAO, regras:REGRAS, voltar:"index.html" });
+
+$("#btnComecar").addEventListener("click", comecar);
+$("#btnSair").addEventListener("click", () => UI.trocarTela("telaPreparo"));
+$("#btnDeNovo").addEventListener("click", comecar);
+$("#btnVoltarPreparo").addEventListener("click", () => UI.trocarTela("telaPreparo"));
+
+document.addEventListener("keydown", e => {
+  if(!jogo || jogo.fase !== "escolher") return;
+  if($("#cortinaPergunta").classList.contains("ativa")) return;
+  const n = Number(e.key);
+  if(n >= 1 && n <= COLS) escolherColuna(n - 1);
+});
+
+montarPreparo();
+</script>
+</body>
+</html>
