@@ -141,6 +141,8 @@
     </label>
   </div>
 
+  <div id="painelSala"></div>
+
   <button class="principal" id="btnComecar">Começar</button>
 </section>
 
@@ -182,6 +184,7 @@
 
 <script src="perguntas.js"></script>
 <script src="comum.js"></script>
+<script src="sala.js"></script>
 <script>
 "use strict";
 
@@ -192,7 +195,7 @@
    v1.0.0
    ========================================================= */
 
-const VERSAO = "1.0.0";
+const VERSAO = "1.1.0";
 const PIPS = {1:[4],2:[0,8],3:[0,4,8],4:[0,2,6,8],5:[0,2,4,6,8],6:[0,2,3,5,6,8]};
 
 /* Casas 0 a 23. As vermelhas (x) andam de 23 para 0 e saem pelo 0;
@@ -434,6 +437,7 @@ function comecar(){
   UI.trocarTela("telaJogo");
   $("#desfecho").innerHTML = "";
   montarTabuleiro();
+  publicar();
   seguirVez();
 }
 
@@ -582,8 +586,12 @@ function seguirVez(){
   redesenhar();
 
   const j = jogadorDe(jogo.vez);
-  $("#btnRolar").disabled = j.tipo === "maquina";
   $("#btnDesfazer").disabled = true;
+  if(Sala.ativa() && !souDaVez()){
+    $("#btnRolar").disabled = true;
+    return avisar("Aguardando " + j.nome + " no outro aparelho…");
+  }
+  $("#btnRolar").disabled = j.tipo === "maquina";
   if(j.tipo === "maquina"){
     avisar(j.nome + " vai rolar…");
     setTimeout(rolar, 700);
@@ -594,6 +602,7 @@ function seguirVez(){
 
 function rolar(){
   if(jogo.fase !== "rolar") return;
+  if(!souDaVez()) return;
   jogo.fase = "rolando";
   $("#btnRolar").disabled = true;
   Som.chacoalhar();
@@ -608,6 +617,7 @@ function rolar(){
     jogo.dados = jogo.valores.slice();
     redesenhar();
 
+    publicar();   // os dados sorteados valem para os dois aparelhos
     if(dupla && cfg.dobradinha) return perguntaDaDobradinha(a);
     if(dupla) avisar("Dobradinha de " + a + ": quatro jogadas.");
     comecarMovimentos();
@@ -633,14 +643,17 @@ function perguntaDaDobradinha(valor){
     }, 750);
   }
 
+  Sala.aoAbrirPergunta();
   Pergunta.abrir({
     para: j.nome,
     nivel: j.nivel,
     texto: a => a ? "Certa. A dobradinha vale as quatro jogadas."
                   : "Errada. A dobradinha vira um lance comum, de duas jogadas.",
     aoResponder: (acertou) => {
+      Sala.aoFecharPergunta();
       if(!acertou){ cair(); avisar("Ficaram só duas jogadas."); }
       else avisar("Quatro jogadas!");
+      publicar();
       comecarMovimentos();
     }
   });
@@ -684,6 +697,7 @@ function seguirMovimento(){
 
 function tocar(p){
   if(jogo.fase !== "mover") return;
+  if(!souDaVez()) return;      // a trava fica na jogada, não no desenho
   if(jogadorDe(jogo.vez).tipo !== "humano") return;
   const legais = lancesLegais(jogo.e, jogo.vez, jogo.dados);
 
@@ -720,6 +734,7 @@ function executar(m){
   else Som.passo(jogo.dados.length);
 
   redesenhar();
+  publicar();
   setTimeout(seguirMovimento, comeu ? 700 : 380);
 }
 
@@ -736,8 +751,88 @@ function desfazer(){
 function passarVez(){
   if(jogo.fase === "fim") return;
   jogo.vez = outra(jogo.vez);
+  jogo.dados = []; jogo.valores = []; jogo.origem = null;
+  jogo.historico = []; jogo.fase = "rolar";
+  publicar();
   seguirVez();
 }
+
+/* ---------------------------------------------------------
+   SALA
+   --------------------------------------------------------- */
+
+function souDaVez(){ return Sala.minhaVez(jogo && jogo.vez === "x" ? 0 : 1); }
+
+function retratar(){
+  if(!jogo) return null;
+  return {
+    nomes: cfg.jogadores.map(j => j.nome),
+    niveis: cfg.jogadores.map(j => j.nivel),
+    dobradinha: cfg.dobradinha,
+    e: {
+      casas: jogo.e.casas.map(c => ({x:c.x, o:c.o})),
+      barra: {x:jogo.e.barra.x, o:jogo.e.barra.o},
+      fora:  {x:jogo.e.fora.x,  o:jogo.e.fora.o}
+    },
+    vez: jogo.vez,
+    dados: jogo.dados.slice(),
+    valores: jogo.valores.slice(),
+    // "respondendo" e "rolando" são estados de meio de caminho:
+    // o outro aparelho só precisa saber que ainda não é a vez dele
+    fase: (jogo.fase === "respondendo" || jogo.fase === "rolando") ? "rolar" : jogo.fase,
+    acabou: jogo.fase === "fim",
+    venceu: jogo.vencedor || null
+  };
+}
+
+function aplicarEstado(d){
+  if(!d) return;
+  cfg.dobradinha = d.dobradinha;
+  cfg.jogadores.forEach((j, i) => {
+    j.nome = (d.nomes[i] === "Máquina") ? "Jogador 2" : d.nomes[i];
+    j.nivel = d.niveis[i];
+    j.tipo = "humano";
+  });
+  const primeira = !jogo;
+  if(primeira) jogo = {historico:[]};
+  Object.assign(jogo, {
+    e: {
+      casas: d.e.casas.map(c => ({x:c.x, o:c.o})),
+      barra: {x:d.e.barra.x, o:d.e.barra.o},
+      fora:  {x:d.e.fora.x,  o:d.e.fora.o}
+    },
+    vez: d.vez, dados: d.dados.slice(), valores: d.valores.slice(),
+    fase: d.fase, origem: null, historico: []
+  });
+  if(primeira){
+    UI.trocarTela("telaJogo");
+    $("#desfecho").innerHTML = "";
+    montarTabuleiro();
+  }
+  if(d.acabou) return fimDaPartida(d.venceu);
+  setTimeout(retomar, 0);
+}
+
+/* Redesenha a partir do estado recebido, sem sortear dado nenhum:
+   quem rola os dados é só o aparelho da vez. */
+function retomar(){
+  if(!jogo || jogo.fase === "fim") return;
+  redesenhar();
+  const j = jogadorDe(jogo.vez);
+  $("#btnDesfazer").disabled = true;
+
+  if(Sala.ativa() && !souDaVez()){
+    $("#btnRolar").disabled = true;
+    return avisar("Aguardando " + j.nome + " no outro aparelho…");
+  }
+  if(jogo.fase === "rolar"){
+    $("#btnRolar").disabled = false;
+    return avisar(j.nome + ", role os dados.");
+  }
+  seguirMovimento();
+}
+
+function publicar(){ Sala.enviar(); }
 
 /* ---------------------------------------------------------
    A MÁQUINA
@@ -811,7 +906,10 @@ function jogadaDaMaquina(){
    --------------------------------------------------------- */
 
 function fimDaPartida(cor){
+  if(jogo.fase === "fim" && $("#telaFim").classList.contains("ativa")) return;
   jogo.fase = "fim";
+  jogo.vencedor = cor;
+  publicar();
   const perdedor = outra(cor);
   let pontos = 1, tipo = "Vitória simples";
   if(jogo.e.fora[perdedor] === 0){
@@ -836,6 +934,25 @@ function fimDaPartida(cor){
    --------------------------------------------------------- */
 
 UI.iniciar({ titulo:"Gamão", versao:VERSAO, regras:REGRAS, voltar:"index.html" });
+
+Sala.montarPainel($("#painelSala"), {
+  jogoId: "gamao", lugares: 2,
+  retratar: retratar, aplicar: aplicarEstado,
+  aoMudarGente: (n) => { if(jogo && jogo.fase !== "fim" && n < 2) avisar("O outro aparelho saiu da sala."); },
+  aoLigar: (lugar) => {
+    cfg.modo = "dupla";
+    cfg.jogadores[1].tipo = "humano";
+    if(cfg.jogadores[1].nome === "Máquina") cfg.jogadores[1].nome = "Jogador 2";
+    montarPreparo();
+    $("#btnComecar").textContent = lugar === 0 ? "Começar (você comanda)" : "Esperando o outro aparelho começar";
+    $("#btnComecar").disabled = lugar !== 0;
+  },
+  aoDesligar: () => {
+    if(Sala.ativa()) Sala.fechar();
+    $("#btnComecar").textContent = "Começar";
+    $("#btnComecar").disabled = false;
+  }
+});
 
 $("#btnComecar").addEventListener("click", comecar);
 $("#btnRolar").addEventListener("click", rolar);

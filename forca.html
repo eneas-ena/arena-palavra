@@ -114,6 +114,8 @@
     <div class="escolhas" id="escRodadas"></div>
   </div>
 
+  <div id="painelSala"></div>
+
   <button class="principal" id="btnComecar">Começar</button>
 </section>
 
@@ -175,6 +177,7 @@
 
 <script src="perguntas.js"></script>
 <script src="comum.js"></script>
+<script src="sala.js"></script>
 <script>
 "use strict";
 
@@ -185,7 +188,7 @@
    v1.0.0
    ========================================================= */
 
-const VERSAO = "1.0.2";
+const VERSAO = "1.1.0";
 const VIDAS = 6;
 
 const REGRAS = `
@@ -349,6 +352,7 @@ function novaPalavra(){
   jogo.erros = 0;
   jogo.pistaUsada = false;
   jogo.fim = false;
+  jogo.frase = ""; jogo.ganhou = false;
   jogo.vez = jogo.comeca;
 
   $("#boneco").innerHTML = "";
@@ -418,6 +422,7 @@ function avisar(t){ $("#aviso").textContent = t || ""; }
 
 function tentarLetra(L){
   if(!jogo || !jogo.item || jogo.fim || jogo.tentadas.has(L)) return;
+  if(!souDaVez()) return;
   jogo.tentadas.add(L);
 
   if(jogo.chave.includes(L)){
@@ -428,6 +433,7 @@ function tentarLetra(L){
     if(completou()) return venceu();
     avisar("Boa. " + atual().nome + " continua.");
     atualizarFaixa();
+    publicar();
   } else {
     errar(atual().nome + " errou a letra " + L + ".");
   }
@@ -464,28 +470,35 @@ function errar(mensagem){
 
   if(jogo.erros >= VIDAS) return perdeu();
 
-  if(cfg.qtd > 1){
-    jogo.vez = (jogo.vez + 1) % cfg.qtd;
+  if(cfg.jogadores.length > 1){
+    jogo.vez = (jogo.vez + 1) % cfg.jogadores.length;
     atualizarFaixa();
     avisar(mensagem + " Agora é a vez de " + atual().nome + ".");
+    publicar();
+    if(Sala.ativa()) seguirTurno();
   } else {
     avisar(mensagem);
+    publicar();
   }
 }
 
 function pedirLetra(){
   if(!jogo || !jogo.item || jogo.fim) return;
+  if(!souDaVez()) return;
   $("#btnLetra").disabled = true;
+  Sala.aoAbrirPergunta();
   Pergunta.abrir({
     para: atual().nome,
     nivel: atual().nivel,
     texto: a => a ? "Certa. Uma letra é revelada." : "Errada. Custa uma vida.",
     aoResponder: (acertou) => {
+      Sala.aoFecharPergunta();
       $("#btnLetra").disabled = false;
       if(acertou){
         revelarUma();
         if(completou()) return venceu();
         avisar("Uma letra veio de graça.");
+        publicar();
       } else {
         errar("A pergunta foi por água abaixo.");
       }
@@ -495,6 +508,7 @@ function pedirLetra(){
 
 function verPergunta(){
   if(!jogo || !jogo.item || jogo.fim || jogo.pistaUsada) return;
+  if(!souDaVez()) return;
   jogo.pistaUsada = true;
   $("#btnPista").disabled = true;
   $("#revelada").textContent = jogo.item.pergunta;
@@ -526,6 +540,10 @@ function perdeu(){
 
 function fecharRodada(frase, ganhou){
   avisar("");
+  jogo.fim = true;
+  jogo.frase = frase;
+  jogo.ganhou = ganhou;
+  publicar();
   $("#btnLetra").disabled = true;
   $("#btnPista").disabled = true;
 
@@ -544,14 +562,17 @@ function fecharRodada(frase, ganhou){
 
   const b = document.createElement("button");
   b.className = "principal";
-  b.textContent = "Próxima palavra";
-  b.addEventListener("click", () => {
+  const comando = Sala.comando();
+  b.textContent = comando ? "Próxima palavra" : "Aguardando a próxima palavra…";
+  b.disabled = !comando;
+  if(comando) b.addEventListener("click", () => {
     jogo.rodada++;
-    jogo.comeca = (jogo.comeca + 1) % cfg.qtd;
+    jogo.comeca = (jogo.comeca + 1) % cfg.jogadores.length;
     novaPalavra();
+    publicar();
   });
   cx.appendChild(b);
-  b.focus();
+  if(comando) b.focus();
 }
 
 function fimDaPartida(){
@@ -579,10 +600,114 @@ function fimDaPartida(){
 }
 
 /* ---------------------------------------------------------
+   SALA
+   --------------------------------------------------------- */
+
+function souDaVez(){ return Sala.minhaVez(jogo ? jogo.vez : 0); }
+
+function retratar(){
+  if(!jogo || !jogo.item) return null;
+  return {
+    alvo: cfg.alvo,
+    nomes: cfg.jogadores.map(j => j.nome),
+    niveis: cfg.jogadores.map(j => j.nivel),
+    pontos: cfg.jogadores.map(j => j.pontos),
+    rodada: jogo.rodada, vez: jogo.vez, comeca: jogo.comeca,
+    item: jogo.item,
+    achadas: [...jogo.achadas], tentadas: [...jogo.tentadas],
+    erros: jogo.erros, pistaUsada: jogo.pistaUsada, fim: jogo.fim,
+    // com a rodada encerrada, o outro aparelho precisa do texto do
+    // desfecho para poder mostrar o botão da próxima palavra
+    frase: jogo.frase || "", ganhou: !!jogo.ganhou
+  };
+}
+
+function aplicarEstado(d){
+  if(!d) return;
+  cfg.alvo = d.alvo;
+  cfg.qtd = d.nomes.length;
+  if(cfg.jogadores.length !== d.nomes.length){
+    cfg.jogadores = d.nomes.map((n, i) => ({
+      nome:n, nivel:d.niveis[i], cor:CORES_JOGADOR[i], pontos:d.pontos[i]
+    }));
+  }
+  cfg.jogadores.forEach((j, i) => { j.nome = d.nomes[i]; j.nivel = d.niveis[i]; j.pontos = d.pontos[i]; });
+
+  const primeira = !jogo;
+  if(primeira){ jogo = {}; UI.trocarTela("telaJogo"); }
+  Object.assign(jogo, {
+    rodada: d.rodada, vez: d.vez, comeca: d.comeca,
+    item: d.item,
+    letras: d.item.palavra.split(""),
+    chave: semAcento(d.item.palavra).split(""),
+    frase: d.frase, ganhou: d.ganhou,
+    achadas: new Set(d.achadas), tentadas: new Set(d.tentadas),
+    erros: d.erros, pistaUsada: d.pistaUsada, fim: d.fim
+  });
+
+  // redesenha tudo a partir do retrato recebido
+  $("#boneco").innerHTML = "";
+  for(let k = 0; k < jogo.erros; k++){
+    const p = PARTES[k];
+    if(!p) break;
+    const e = document.createElementNS("http://www.w3.org/2000/svg", p.t);
+    for(const a in p.a) e.setAttribute(a, p.a[a]);
+    e.setAttribute("class", "corpo"); e.setAttribute("pathLength", "1");
+    $("#boneco").appendChild(e);
+  }
+  $("#categoria").textContent = jogo.item.categoria;
+  $("#revelada").textContent = jogo.item.pergunta;
+  $("#revelada").style.display = jogo.pistaUsada ? "block" : "none";
+  $("#desfecho").innerHTML = "";
+  desenharPalavra(jogo.fim && jogo.erros >= VIDAS);
+  montarTeclado();
+  atualizarFaixa();
+
+  if(jogo.fim) return fecharRodada(d.frase, d.ganhou);
+  seguirTurno();
+}
+
+function travarBotoes(t){
+  $("#btnLetra").disabled = t;
+  $("#btnPista").disabled = t || jogo.pistaUsada;
+  $$("#teclado .tecla").forEach(b => { if(t) b.disabled = true; });
+}
+
+function seguirTurno(){
+  const j = atual();
+  if(Sala.ativa() && !souDaVez()){
+    travarBotoes(true);
+    return avisar("Aguardando " + j.nome + " no outro aparelho…");
+  }
+  travarBotoes(false);
+  montarTeclado();
+  avisar(cfg.jogadores.length === 1 ? "Escolha uma letra." : j.nome + ", escolha uma letra.");
+}
+
+function publicar(){ Sala.enviar(); }
+
+/* ---------------------------------------------------------
    LIGAÇÕES
    --------------------------------------------------------- */
 
 UI.iniciar({ titulo:"Forca", versao:VERSAO, regras:REGRAS, voltar:"index.html" });
+
+Sala.montarPainel($("#painelSala"), {
+  jogoId: "forca", lugares: 2,
+  retratar: retratar, aplicar: aplicarEstado,
+  aoMudarGente: (n) => { if(jogo && !jogo.fim && n < 2) avisar("O outro aparelho saiu da sala."); },
+  aoLigar: (lugar) => {
+    cfg.qtd = 2;                    // numa sala jogam dois, um em cada aparelho
+    montarPreparo();
+    $("#btnComecar").textContent = lugar === 0 ? "Começar (você comanda)" : "Esperando o outro aparelho começar";
+    $("#btnComecar").disabled = lugar !== 0;
+  },
+  aoDesligar: () => {
+    if(Sala.ativa()) Sala.fechar();
+    $("#btnComecar").textContent = "Começar";
+    $("#btnComecar").disabled = false;
+  }
+});
 
 $("#btnComecar").addEventListener("click", comecar);
 $("#btnLetra").addEventListener("click", pedirLetra);
