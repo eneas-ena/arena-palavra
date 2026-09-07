@@ -95,6 +95,8 @@
     <p class="legenda" style="margin:0">Mar de 7 por 7. Quatro navios de cada lado: um de quatro casas, um de três e dois de duas.</p>
   </div>
 
+  <div id="painelSala"></div>
+
   <button class="principal" id="btnPosicionar">Posicionar a frota</button>
 </section>
 
@@ -150,6 +152,7 @@
 
 <script src="perguntas.js"></script>
 <script src="comum.js"></script>
+<script src="sala.js"></script>
 <script>
 "use strict";
 
@@ -160,7 +163,7 @@
    v1.0.0
    ========================================================= */
 
-const VERSAO = "1.0.1";
+const VERSAO = "1.1.0";
 const N = 7;
 const NAVIOS = [
   {nome:"Porta-aviões", tam:4},
@@ -243,7 +246,9 @@ function desenharMar(container, mar, tiros, mostrarNavios, aoClicar){
 
     if(t === "agua"){ casa.classList.add("agua"); casa.textContent = "·"; }
     else if(t === "acerto"){
-      const afundou = navioAfundado(mar, tiros, mar[p]);
+      // no mar inimigo sem frota conhecida, quem diz que afundou é o adversário
+      const afundou = mar ? navioAfundado(mar, tiros, mar[p])
+                          : (jogo && jogo.afundadasDele.has(p));
       casa.classList.add(mostrarNavios ? "atingido" : (afundou ? "afundado" : "acerto"));
       casa.textContent = afundou ? "✖" : "✷";
     }
@@ -262,17 +267,19 @@ function desenharMar(container, mar, tiros, mostrarNavios, aoClicar){
 }
 
 function navioAfundado(mar, tiros, id){
-  if(id === null || id === undefined) return false;
+  if(!mar || id === null || id === undefined) return false;
   for(let p = 0; p < N*N; p++)
     if(mar[p] === id && tiros[p] !== "acerto") return false;
   return true;
 }
 
-function desenharFrota(container, mar, tiros){
+function desenharFrota(container, mar, tiros, afundadosSemMar){
   container.innerHTML = "";
   NAVIOS.forEach((nv, id) => {
+    const caiu = mar ? (tiros && navioAfundado(mar, tiros, id))
+                     : (afundadosSemMar !== undefined && id < afundadosSemMar);
     const b = document.createElement("span");
-    b.className = "barco" + (tiros && navioAfundado(mar, tiros, id) ? " afundado" : "");
+    b.className = "barco" + (caiu ? " afundado" : "");
     const casco = document.createElement("span");
     casco.className = "casco";
     for(let k = 0; k < nv.tam; k++) casco.appendChild(document.createElement("i"));
@@ -314,6 +321,9 @@ function montarPreparo(){
 }
 
 function abrirPosicionamento(){
+  jogo0.euPronto = false;
+  $("#btnZarpar").disabled = false;
+  $("#btnZarpar").textContent = "Zarpar";
   previewMar = sortearMar();
   desenharMar($("#marPreview"), previewMar, null, true, null);
   desenharFrota($("#frotaPreview"), previewMar, null);
@@ -325,6 +335,14 @@ function abrirPosicionamento(){
    --------------------------------------------------------- */
 
 function zarpar(){
+  if(online()){
+    jogo0.euPronto = true;
+    enviarRecado({tipo:"pronto", nome: cfg.nome});
+    if(jogo0.elePronto) return iniciarOnline();
+    $("#btnZarpar").disabled = true;
+    $("#btnZarpar").textContent = "Esperando o outro aparelho posicionar…";
+    return;
+  }
   Banco.zerar();
   jogo = {
     meuMar: previewMar,
@@ -348,7 +366,7 @@ function redesenhar(){
   desenharMar($("#marInimigo"), jogo.marDela, jogo.meusTiros, false,
               jogo.vez === "eu" && jogo.fase === "mirar" ? mirar : null);
   desenharMar($("#marProprio"), jogo.meuMar, jogo.tirosDela, true, null);
-  desenharFrota($("#frotaInimiga"), jogo.marDela, jogo.meusTiros);
+  desenharFrota($("#frotaInimiga"), jogo.marDela, jogo.meusTiros, jogo.navioAfundados);
   desenharFrota($("#frotaPropria"), jogo.meuMar, jogo.tirosDela);
   atualizarLinha();
 }
@@ -359,8 +377,9 @@ function atualizarLinha(){
   const meu = jogo.vez === "eu";
   $("#linhaInfo").style.setProperty("--vez-cor", meu ? "var(--gold)" : "var(--carmim-claro)");
   $("#infoBolinha").style.background = meu ? "var(--gold)" : "var(--carmim-claro)";
-  $("#infoNome").textContent = meu ? cfg.nome : "Máquina";
-  $("#infoSub").textContent = meu ? "sua vez de atirar" : "a máquina está atirando";
+  const outro = jogo.eleNome || "Máquina";
+  $("#infoNome").textContent = meu ? cfg.nome : outro;
+  $("#infoSub").textContent = meu ? "sua vez de atirar" : outro + " está atirando";
   $("#infoContagem").innerHTML =
     "você acertou " + contarAcertos(jogo.meusTiros) + " de " + CASAS_COM_NAVIO + "<br>" +
     "ela acertou " + contarAcertos(jogo.tirosDela) + " de " + CASAS_COM_NAVIO;
@@ -372,6 +391,7 @@ function avisar(t){ $("#aviso").textContent = t || ""; }
 
 function mirar(p){
   if(jogo.fase !== "mirar" || jogo.vez !== "eu") return;
+  if(online() && jogo.meusTiros[p]) return;
   if(jogo.meusTiros[p]) return;
 
   jogo.fase = "respondendo";
@@ -380,6 +400,7 @@ function mirar(p){
   const casa = $('#marInimigo .casa[data-p="' + p + '"]');
   if(casa) casa.classList.add("alvo");
 
+  Sala.aoAbrirPergunta();
   Pergunta.abrir({
     para: cfg.nome,
     nivel: cfg.nivel,
@@ -388,7 +409,22 @@ function mirar(p){
       if(!acertou){
         Som.erro();
         avisar("A pergunta falhou. O tiro ficou no canhão.");
+        Sala.aoFecharPergunta();
+        if(online()){
+          jogo.vez = "ele";
+          jogo.fase = "mirar";   // sem isto o aparelho não aceita mirar de novo
+          enviarRecado({tipo:"passou"});
+          redesenhar();
+          return avisar(avisoDaVez());
+        }
         return passarVez();
+      }
+      Sala.aoFecharPergunta();
+      if(online()){
+        jogo.fase = "mirar";
+        enviarRecado({tipo:"tiro", p});
+        avisar("Tiro disparado. Esperando a resposta…");
+        return;
       }
       atirar("eu", p);
     }
@@ -517,11 +553,131 @@ function fimDaPartida(vencedor){
   jogo.fase = "acabou";
   const ganhei = vencedor === "eu";
   if(ganhei) Som.vitoria(); else Som.pausa();
-  $("#fimTitulo").textContent = ganhei ? cfg.nome + " venceu a batalha" : "A máquina venceu";
+  $("#fimTitulo").textContent = ganhei ? cfg.nome + " venceu a batalha"
+                                       : (jogo.eleNome || "A máquina") + " venceu";
   $("#fimSub").textContent =
     "Você acertou " + contarAcertos(jogo.meusTiros) + " de " + CASAS_COM_NAVIO +
-    " · a máquina acertou " + contarAcertos(jogo.tirosDela) + " de " + CASAS_COM_NAVIO;
+    " · " + (jogo.eleNome || "a máquina") + " acertou " + contarAcertos(jogo.tirosDela) + " de " + CASAS_COM_NAVIO;
   UI.trocarTela("telaFim");
+}
+
+/* ---------------------------------------------------------
+   SALA — aqui a sincronia é diferente de todos os outros jogos
+
+   Nos demais, um aparelho descreve a partida inteira e o outro copia.
+   Aqui isso seria trapaça: o retrato conteria o mar do adversário.
+
+   Então cada aparelho guarda a própria frota e nunca a envia. O que
+   viaja são recados curtos:
+     tiro      — atirei na casa tal
+     resultado — na sua casa tal foi água / acerto / afundou tal navio
+     passou    — errei a pergunta, a vez é sua
+     pronto    — minha frota está posicionada
+   Quem sabe se um tiro acertou é o dono do mar, e só ele responde.
+   --------------------------------------------------------- */
+
+function online(){ return Sala.ativa(); }
+
+function enviarRecado(msg){ if(Sala.ativa()) Sala.publicar(msg); }
+
+function receberRecado(m){
+  if(!m || !m.tipo) return;
+
+  if(m.tipo === "pronto"){
+    jogo0.eleNome = m.nome || "Jogador 2";
+    jogo0.elePronto = true;
+    if(jogo0.euPronto) iniciarOnline();
+    else avisar("O outro aparelho já posicionou a frota.");
+    return;
+  }
+
+  if(!jogo) return;
+
+  if(m.tipo === "tiro"){
+    // o tiro é no MEU mar: só eu sei o que tem lá
+    const p = m.p;
+    if(jogo.tirosDela[p]) return;
+    const acertou = jogo.meuMar[p] !== null;
+    jogo.tirosDela[p] = acertou ? "acerto" : "agua";
+    const id = jogo.meuMar[p];
+    const afundou = acertou && navioAfundado(jogo.meuMar, jogo.tirosDela, id);
+    const celulas = [];
+    if(afundou) for(let q = 0; q < N*N; q++) if(jogo.meuMar[q] === id) celulas.push(q);
+    const perdi = contarAcertos(jogo.tirosDela) >= CASAS_COM_NAVIO;
+
+    enviarRecado({tipo:"resultado", p, acertou, afundou, navio: afundou ? NAVIOS[id].nome : null,
+                  celulas, acabou: perdi});
+
+    if(acertou){ Som.marcar(); if(afundou) Som.chegou(); }
+    else Som.toque();
+    const nome = String.fromCharCode(65 + col(p)) + (lin(p) + 1);
+    avisar(afundou ? jogo.eleNome + " afundou o " + NAVIOS[id].nome + " em " + nome + "!"
+         : acertou ? jogo.eleNome + " acertou um navio em " + nome + "."
+                   : jogo.eleNome + " caiu na água em " + nome + ".");
+    jogo.vez = acertou ? "ele" : "eu";
+    jogo.fase = "mirar";
+    if(perdi) return setTimeout(() => fimDaPartida("ele"), 900);
+    redesenhar();
+    return;
+  }
+
+  if(m.tipo === "resultado"){
+    jogo.meusTiros[m.p] = m.acertou ? "acerto" : "agua";
+    if(m.afundou){
+      m.celulas.forEach(q => jogo.afundadasDele.add(q));
+      jogo.navioAfundados++;
+    }
+    const nome = String.fromCharCode(65 + col(m.p)) + (lin(m.p) + 1);
+    if(m.acertou){ Som.marcar(); if(m.afundou) Som.chegou(); }
+    else Som.toque();
+    avisar(m.afundou ? "Você afundou o " + m.navio + " em " + nome + "!"
+         : m.acertou ? "Você acertou um navio em " + nome + "."
+                     : "Você caiu na água em " + nome + ".");
+    jogo.vez = m.acertou ? "eu" : "ele";
+    jogo.fase = "mirar";
+    if(m.acabou) return setTimeout(() => fimDaPartida("eu"), 900);
+    redesenhar();
+    if(jogo.vez === "eu") avisar(avisoDaVez());
+    return;
+  }
+
+  if(m.tipo === "passou"){
+    avisar(jogo.eleNome + " errou a pergunta e perdeu o tiro.");
+    jogo.vez = "eu";
+    jogo.fase = "mirar";
+    redesenhar();
+    setTimeout(() => avisar(avisoDaVez()), 900);
+    return;
+  }
+}
+
+function avisoDaVez(){
+  return jogo.vez === "eu" ? cfg.nome + ", escolha onde atirar."
+                           : jogo.eleNome + " está mirando…";
+}
+
+/* guarda o que se sabe antes de a partida existir */
+const jogo0 = { euPronto:false, elePronto:false, eleNome:"Jogador 2" };
+
+function iniciarOnline(){
+  Banco.zerar();
+  jogo = {
+    meuMar: previewMar,
+    marDela: null,                 // não existe deste lado, e é essa a graça
+    tirosDela: Array(N*N).fill(null),
+    meusTiros: Array(N*N).fill(null),
+    afundadasDele: new Set(),
+    navioAfundados: 0,
+    eleNome: jogo0.eleNome,
+    vez: Sala.meuLugar === 0 ? "eu" : "ele",
+    fase: "mirar",
+    pendente: null
+  };
+  UI.trocarTela("telaJogo");
+  $("#desfecho").innerHTML = "";
+  redesenhar();
+  Som.chegou();
+  avisar(avisoDaVez());
 }
 
 /* ---------------------------------------------------------
@@ -529,6 +685,21 @@ function fimDaPartida(vencedor){
    --------------------------------------------------------- */
 
 UI.iniciar({ titulo:"Batalha Naval", versao:VERSAO, regras:REGRAS, voltar:"index.html" });
+
+Sala.montarPainel($("#painelSala"), {
+  jogoId: "naval", lugares: 2,
+  retratar: () => null,                 // aqui não se publica estado, só recados
+  aplicar: (m) => receberRecado(m),
+  aoMudarGente: (n) => { if(jogo && jogo.fase !== "acabou" && n < 2) avisar("O outro aparelho saiu da sala."); },
+  aoLigar: (lugar) => {
+    $("#btnPosicionar").textContent = "Posicionar a frota (você é o jogador " + (lugar + 1) + ")";
+  },
+  aoDesligar: () => {
+    if(Sala.ativa()) Sala.fechar();
+    jogo0.euPronto = jogo0.elePronto = false;
+    $("#btnPosicionar").textContent = "Posicionar a frota";
+  }
+});
 
 $("#btnPosicionar").addEventListener("click", abrirPosicionamento);
 $("#btnSortear").addEventListener("click", () => {
