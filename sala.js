@@ -15,12 +15,30 @@
    não existe tabela nenhuma, não há o que ler nem o que estragar.
    Para trocar de projeto, mude as duas linhas.
    ---------------------------------------------------------
-   sala.js v1.3.1
+   sala.js v1.4.0
    ========================================================= */
 "use strict";
 
 const SUPABASE_URL   = "https://hyfayoqhaqbsnzyqpeqs.supabase.co";
 const SUPABASE_ANON  = "sb_publishable_N0fGYr9UWwWabfRrTWWjyQ_28QZBQ3K";
+
+/* O painel leva o próprio estilo consigo. A Trilha é anterior ao
+   comum.css e não o carrega — sem isto, o código da sala aparecia
+   pequeno e o campo de digitar ficava sem forma naquele jogo. */
+(function estiloDaSala(){
+  if(document.getElementById("estilo-sala")) return;
+  const e = document.createElement("style");
+  e.id = "estilo-sala";
+  e.textContent =
+    ".codigo-sala{font-family:'Cinzel',serif;font-size:38px;letter-spacing:8px;" +
+      "color:var(--gold,#C9A227);margin:4px 0 12px;text-align:center;font-weight:600}" +
+    ".campo-codigo{width:100%;padding:14px;border-radius:9px;" +
+      "border:1px solid var(--linha,#2A3A57);background:var(--surface-2,#16264A);" +
+      "color:var(--ink,#F2EDE1);font-family:'Cinzel',serif;font-size:30px;" +
+      "text-align:center;letter-spacing:8px;text-transform:uppercase}" +
+    ".campo-codigo::placeholder{letter-spacing:2px;font-size:18px;color:var(--ink-dim,#A9B4C7)}";
+  document.head.appendChild(e);
+})();
 
 const Sala = {
   /* ---------- estado interno ---------- */
