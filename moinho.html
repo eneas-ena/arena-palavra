@@ -78,6 +78,8 @@
     <div id="listaJogadores"></div>
   </div>
 
+  <div id="painelSala"></div>
+
   <button class="principal" id="btnComecar">Começar</button>
 </section>
 
@@ -125,6 +127,7 @@
 
 <script src="perguntas.js"></script>
 <script src="comum.js"></script>
+<script src="sala.js"></script>
 <script>
 "use strict";
 
@@ -135,7 +138,7 @@
    v1.0.0
    ========================================================= */
 
-const VERSAO = "1.0.1";
+const VERSAO = "1.1.0";
 const PECAS = 9;
 const LANCES_SEM_PROGRESSO = 40;   // sem nenhuma peça sair, a partida empata
 
@@ -306,6 +309,7 @@ function comecar(){
   UI.trocarTela("telaJogo");
   desenharTrilhos();
   redesenhar();
+  publicar();
   seguirVez();
 }
 
@@ -421,6 +425,9 @@ function seguirVez(){
   if(perdeu(jogo, jogo.vez)) return fimDaPartida(outra(jogo.vez),
     pecasDe(jogo.tab, jogo.vez).length < 3 ? "ficou com menos de três peças" : "ficou sem movimento");
 
+  if(Sala.ativa() && !souDaVez())
+    return avisar("Aguardando " + j.nome + " jogar no outro aparelho…");
+
   if(j.tipo === "maquina"){
     jogo.fase = "pensando";
     redesenhar();
@@ -435,6 +442,7 @@ function seguirVez(){
 
 function tocarPonto(i){
   if(jogadorDe(jogo.vez).tipo !== "humano") return;
+  if(!souDaVez()) return;      // a trava fica na jogada, não no desenho
 
   if(jogo.fase === "removendo"){
     if(!removiveis(jogo.tab, outra(jogo.vez)).includes(i)) return;
@@ -443,6 +451,7 @@ function tocarPonto(i){
     Som.comeu();
     avisar("Peça retirada.");
     jogo.ultimoMoinho = null;
+    publicar();
     return setTimeout(trocarVez, 700);
   }
 
@@ -475,6 +484,7 @@ function executar(mov){
   const fez = MOINHOS.find(m => m.includes(mov.para) && m.every(p => jogo.tab[p] === marca));
   jogo.ultimoMoinho = fez || null;
   redesenhar();
+  publicar();
 
   if(!fez) return setTimeout(trocarVez, 550);
 
@@ -505,20 +515,24 @@ function executar(mov){
   }
 
   setTimeout(() => {
+    Sala.aoAbrirPergunta();
     Pergunta.abrir({
       para: j.nome,
       nivel: j.nivel,
       texto: a => a ? "Certa. Escolha a peça do adversário que vai sair."
                     : "Errada. O moinho não rende nada desta vez.",
       aoResponder: (acertou) => {
+        Sala.aoFecharPergunta();
         if(!acertou){
           jogo.ultimoMoinho = null;
           redesenhar();
           avisar("O moinho não rendeu nada.");
+          publicar();
           return setTimeout(trocarVez, 700);
         }
         jogo.fase = "removendo";
         redesenhar();
+        publicar();
         avisar("Toque na peça do adversário que vai sair.");
       }
     });
@@ -528,11 +542,58 @@ function executar(mov){
 function trocarVez(){
   if(jogo.fase === "fim") return;
   jogo.ultimoMoinho = null;
+  publicar();
   if(jogo.semProgresso >= LANCES_SEM_PROGRESSO)
     return fimDaPartida(null, "quarenta lances sem nenhuma peça sair do tabuleiro");
   jogo.vez = outra(jogo.vez);
   seguirVez();
 }
+
+/* ---------------------------------------------------------
+   SALA
+   --------------------------------------------------------- */
+
+function souDaVez(){ return Sala.minhaVez(jogo && jogo.vez === "X" ? 0 : 1); }
+
+function retratar(){
+  if(!jogo) return null;
+  return {
+    nomes: cfg.jogadores.map(j => j.nome),
+    niveis: cfg.jogadores.map(j => j.nivel),
+    tab: jogo.tab, naMao: jogo.naMao, vez: jogo.vez,
+    fase: jogo.fase === "respondendo" || jogo.fase === "pensando" ? "jogar" : jogo.fase,
+    semProgresso: jogo.semProgresso,
+    ultimoMoinho: jogo.ultimoMoinho,
+    acabou: jogo.fase === "fim",
+    venceu: jogo.vencedor === undefined ? null : jogo.vencedor,
+    motivo: jogo.motivo || ""
+  };
+}
+
+function aplicarEstado(d){
+  if(!d) return;
+  cfg.jogadores.forEach((j, i) => {
+    j.nome = (d.nomes[i] === "Máquina") ? "Jogador 2" : d.nomes[i];
+    j.nivel = d.niveis[i];
+    j.tipo = "humano";
+  });
+  const primeira = !jogo;
+  if(primeira) jogo = {};
+  Object.assign(jogo, {
+    tab: d.tab, naMao: d.naMao, vez: d.vez, fase: d.fase,
+    semProgresso: d.semProgresso, ultimoMoinho: d.ultimoMoinho,
+    selecionada: null, coroaOferecida: false
+  });
+  if(primeira){
+    UI.trocarTela("telaJogo");
+    $("#desfecho").innerHTML = "";
+    desenharTrilhos();
+  }
+  if(d.acabou) return fimDaPartida(d.venceu, d.motivo);
+  setTimeout(seguirVez, 0);
+}
+
+function publicar(){ Sala.enviar(); }
 
 /* ---------------------------------------------------------
    A MÁQUINA
@@ -647,7 +708,11 @@ function jogadaDaMaquina(){
    --------------------------------------------------------- */
 
 function fimDaPartida(marca, motivo){
+  if(jogo.fase === "fim" && $("#telaFim").classList.contains("ativa")) return;
   jogo.fase = "fim";
+  jogo.vencedor = marca;
+  jogo.motivo = motivo;
+  publicar();
   if(marca === null){
     Som.empate();
     $("#fimTitulo").textContent = "Empate";
@@ -665,6 +730,25 @@ function fimDaPartida(marca, motivo){
    --------------------------------------------------------- */
 
 UI.iniciar({ titulo:"Moinho", versao:VERSAO, regras:REGRAS, voltar:"index.html" });
+
+Sala.montarPainel($("#painelSala"), {
+  jogoId: "moinho", lugares: 2,
+  retratar: retratar, aplicar: aplicarEstado,
+  aoMudarGente: (n) => { if(jogo && jogo.fase !== "fim" && n < 2) avisar("O outro aparelho saiu da sala."); },
+  aoLigar: (lugar) => {
+    cfg.modo = "dupla";
+    cfg.jogadores[1].tipo = "humano";
+    if(cfg.jogadores[1].nome === "Máquina") cfg.jogadores[1].nome = "Jogador 2";
+    montarPreparo();
+    $("#btnComecar").textContent = lugar === 0 ? "Começar (você comanda)" : "Esperando o outro aparelho começar";
+    $("#btnComecar").disabled = lugar !== 0;
+  },
+  aoDesligar: () => {
+    if(Sala.ativa()) Sala.fechar();
+    $("#btnComecar").textContent = "Começar";
+    $("#btnComecar").disabled = false;
+  }
+});
 
 $("#btnComecar").addEventListener("click", comecar);
 $("#btnSair").addEventListener("click", () => UI.trocarTela("telaPreparo"));

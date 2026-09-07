@@ -154,12 +154,18 @@ const Sala = {
      PUBLICAR E RECEBER
      ========================================================= */
 
+  /* O número da mensagem é um relógio lógico: ele nunca anda para trás
+     e sobe acima de tudo que já se viu. Se os dois aparelhos publicarem
+     no mesmo número, ganha o de lugar menor — assim os dois convergem
+     para o mesmo estado em vez de descartarem a mensagem um do outro
+     e ficarem esperando eternamente. */
   publicar(estado){
     if(!this.ligada) return;
     this.versao++;
     this.transporte.enviar("estado", {
       jogoId: this.jogoId,
       versao: this.versao,
+      lugar: this.meuLugar,
       estado
     });
   },
@@ -177,9 +183,16 @@ const Sala = {
     }
 
     if(msg.jogoId && msg.jogoId !== this.jogoId) return;
-    // mensagem atrasada, de uma jogada que já foi superada
-    if(typeof msg.versao === "number" && msg.versao <= this.versao) return;
-    if(typeof msg.versao === "number") this.versao = msg.versao;
+
+    if(typeof msg.versao === "number"){
+      const maisNova = msg.versao > this.versao;
+      const empateResolvido = msg.versao === this.versao
+        && typeof msg.lugar === "number" && msg.lugar < this.meuLugar;
+      // o relógio sobe mesmo quando a mensagem é descartada,
+      // senão os dois lados ficam presos no mesmo número
+      this.versao = Math.max(this.versao, msg.versao);
+      if(!maisNova && !empateResolvido) return;
+    }
 
     if(this.ganchos.aoReceberEstado) this.ganchos.aoReceberEstado(msg.estado);
   },

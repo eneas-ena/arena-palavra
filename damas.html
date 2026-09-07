@@ -106,6 +106,8 @@
     </label>
   </div>
 
+  <div id="painelSala"></div>
+
   <button class="principal" id="btnComecar">Começar</button>
 </section>
 
@@ -140,6 +142,7 @@
 
 <script src="perguntas.js"></script>
 <script src="comum.js"></script>
+<script src="sala.js"></script>
 <script>
 "use strict";
 
@@ -151,7 +154,7 @@
    v1.0.0
    ========================================================= */
 
-const VERSAO = "1.0.0";
+const VERSAO = "1.1.0";
 const N = 8;
 const DIRS = [[-1,-1],[-1,1],[1,-1],[1,1]];
 const SEM_PROGRESSO = 40;      // lances de dama sem captura até o empate
@@ -355,6 +358,7 @@ function comecar(){
   UI.trocarTela("telaJogo");
   $("#desfecho").innerHTML = "";
   montarTabuleiro();
+  publicar();
   seguirVez();
 }
 
@@ -451,6 +455,11 @@ function seguirVez(){
   if(jogo.semProgresso >= SEM_PROGRESSO)
     return fimDaPartida(null, "quarenta lances sem captura");
 
+  if(Sala.ativa() && !souDaVez()){
+    redesenhar();
+    return avisar("Aguardando " + j.nome + " jogar no outro aparelho…");
+  }
+
   // uma pedra parada na última fileira ganha nova chance de coroar
   const esperando = cfg.coroar ? pedraNaCoroacao(jogo.tab, jogo.vez) : -1;
   if(esperando >= 0 && !jogo.coroaOferecida){
@@ -481,6 +490,7 @@ function pedirCoroa(posicao, aoFim){
     Som.chegou();
     avisar(j.nome + " coroou uma dama!");
     redesenhar();
+    publicar();
   };
 
   if(j.tipo === "maquina"){
@@ -492,11 +502,13 @@ function pedirCoroa(posicao, aoFim){
     }, 700);
   }
 
+  Sala.aoAbrirPergunta();
   Pergunta.abrir({
     para: j.nome,
     nivel: j.nivel,
     texto: a => a ? "Certa. A pedra recebe a coroa." : "Errada. A pedra fica onde está, sem coroa.",
     aoResponder: (acertou) => {
+      Sala.aoFecharPergunta();
       if(acertou) coroar();
       else { avisar("A coroa fica para a próxima."); }
       setTimeout(aoFim, 700);
@@ -508,6 +520,7 @@ function pedirCoroa(posicao, aoFim){
 
 function tocar(p){
   if(jogo.fase !== "jogar") return;
+  if(!souDaVez()) return;      // a trava fica na jogada, não no desenho
   if(jogadorDe(jogo.vez).tipo !== "humano") return;
 
   const movs = movimentos(jogo.tab, jogo.vez);
@@ -552,6 +565,7 @@ function executar(mov){
   else jogo.semProgresso++;
 
   Som.marcar();
+  publicar();
   if(mov.comidas.length){
     Som.comeu();
     avisar(jogadorDe(cor).nome + " comeu " +
@@ -574,8 +588,56 @@ function passarVez(){
   if(jogo.fase === "fim") return;
   jogo.vez = outra(jogo.vez);
   jogo.coroaOferecida = false;
+  publicar();
   seguirVez();
 }
+
+/* ---------------------------------------------------------
+   SALA
+   --------------------------------------------------------- */
+
+function souDaVez(){ return Sala.minhaVez(jogo && jogo.vez === "x" ? 0 : 1); }
+
+function retratar(){
+  if(!jogo) return null;
+  return {
+    nomes: cfg.jogadores.map(j => j.nome),
+    niveis: cfg.jogadores.map(j => j.nivel),
+    coroar: cfg.coroar,
+    tab: jogo.tab.map(x => x ? {c:x.c, dama:!!x.dama} : null),
+    vez: jogo.vez,
+    semProgresso: jogo.semProgresso,
+    acabou: jogo.fase === "fim",
+    venceu: jogo.vencedor === undefined ? null : jogo.vencedor,
+    motivo: jogo.motivo || ""
+  };
+}
+
+function aplicarEstado(d){
+  if(!d) return;
+  cfg.coroar = d.coroar;
+  cfg.jogadores.forEach((j, i) => {
+    j.nome = (d.nomes[i] === "Máquina") ? "Jogador 2" : d.nomes[i];
+    j.nivel = d.niveis[i];
+    j.tipo = "humano";
+  });
+  const primeira = !jogo;
+  if(primeira) jogo = {};
+  Object.assign(jogo, {
+    tab: d.tab.map(x => x ? {c:x.c, dama:!!x.dama} : null),
+    vez: d.vez, fase: "jogar", selecionada: null, prefixo: [],
+    semProgresso: d.semProgresso, coroaOferecida: false
+  });
+  if(primeira){
+    UI.trocarTela("telaJogo");
+    $("#desfecho").innerHTML = "";
+    montarTabuleiro();
+  }
+  if(d.acabou) return fimDaPartida(d.venceu, d.motivo);
+  setTimeout(seguirVez, 0);
+}
+
+function publicar(){ Sala.enviar(); }
 
 /* ---------------------------------------------------------
    A MÁQUINA
@@ -648,7 +710,11 @@ function jogadaDaMaquina(){
    --------------------------------------------------------- */
 
 function fimDaPartida(cor, motivo){
+  if(jogo.fase === "fim" && $("#telaFim").classList.contains("ativa")) return;
   jogo.fase = "fim";
+  jogo.vencedor = cor;
+  jogo.motivo = motivo;
+  publicar();
   redesenhar();
   if(cor === null){
     Som.empate();
@@ -667,6 +733,25 @@ function fimDaPartida(cor, motivo){
    --------------------------------------------------------- */
 
 UI.iniciar({ titulo:"Damas", versao:VERSAO, regras:REGRAS, voltar:"index.html" });
+
+Sala.montarPainel($("#painelSala"), {
+  jogoId: "damas", lugares: 2,
+  retratar: retratar, aplicar: aplicarEstado,
+  aoMudarGente: (n) => { if(jogo && jogo.fase !== "fim" && n < 2) avisar("O outro aparelho saiu da sala."); },
+  aoLigar: (lugar) => {
+    cfg.modo = "dupla";
+    cfg.jogadores[1].tipo = "humano";
+    if(cfg.jogadores[1].nome === "Máquina") cfg.jogadores[1].nome = "Jogador 2";
+    montarPreparo();
+    $("#btnComecar").textContent = lugar === 0 ? "Começar (você comanda)" : "Esperando o outro aparelho começar";
+    $("#btnComecar").disabled = lugar !== 0;
+  },
+  aoDesligar: () => {
+    if(Sala.ativa()) Sala.fechar();
+    $("#btnComecar").textContent = "Começar";
+    $("#btnComecar").disabled = false;
+  }
+});
 
 $("#btnComecar").addEventListener("click", comecar);
 $("#btnSair").addEventListener("click", () => UI.trocarTela("telaPreparo"));

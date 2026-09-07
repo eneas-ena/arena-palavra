@@ -92,6 +92,8 @@
     <div id="listaJogadores"></div>
   </div>
 
+  <div id="painelSala"></div>
+
   <button class="principal" id="btnComecar">Começar</button>
 </section>
 
@@ -127,6 +129,7 @@
 
 <script src="perguntas.js"></script>
 <script src="comum.js"></script>
+<script src="sala.js"></script>
 <script>
 "use strict";
 
@@ -138,7 +141,7 @@
    v1.0.0
    ========================================================= */
 
-const VERSAO = "1.0.0";
+const VERSAO = "1.1.0";
 const N = 8;
 const CANTOS = [0, 7, 56, 63];
 
@@ -287,6 +290,7 @@ function comecar(){
   UI.trocarTela("telaJogo");
   $("#desfecho").innerHTML = "";
   montarTabuleiro();
+  publicar();
   seguirVez();
 }
 
@@ -309,7 +313,8 @@ function montarTabuleiro(){
 
 function redesenhar(){
   const casas = $$("#tabuleiro .casa");
-  const meuTurno = jogo.fase === "jogar" && jogadorDe(jogo.vez).tipo === "humano";
+  // quem está esperando não deve nem ver as casas marcadas do adversário
+  const meuTurno = jogo.fase === "jogar" && jogadorDe(jogo.vez).tipo === "humano" && souDaVez();
   const possiveis = meuTurno ? jogadas(jogo.tab, jogo.vez).map(m => m.p) : [];
 
   casas.forEach((b, p) => {
@@ -348,6 +353,14 @@ function seguirVez(){
   jogo.fase = "jogar";
   jogo.virando = [];
   const j = jogadorDe(jogo.vez);
+
+  // numa sala, só o aparelho da vez decide o que acontece: passar a vez
+  // também é decisão, e se os dois decidissem, a partida andaria dobrado
+  if(Sala.ativa() && !souDaVez()){
+    redesenhar();
+    return avisar("Aguardando " + j.nome + " jogar no outro aparelho…");
+  }
+
   const minhas = jogadas(jogo.tab, jogo.vez);
 
   if(minhas.length === 0){
@@ -357,6 +370,7 @@ function seguirVez(){
     avisar(j.nome + " não tem jogada e passa a vez.");
     Som.pausa();
     jogo.vez = outra(jogo.vez);
+    publicar();
     return setTimeout(seguirVez, 1200);
   }
   jogo.passouSeguido = 0;
@@ -377,6 +391,7 @@ function seguirVez(){
 
 function tocar(p){
   if(jogo.fase !== "jogar") return;
+  if(!souDaVez()) return;      // a trava fica na jogada, não no botão
   if(jogadorDe(jogo.vez).tipo !== "humano") return;
   const m = jogadas(jogo.tab, jogo.vez).find(x => x.p === p);
   if(!m) return;
@@ -385,6 +400,7 @@ function tocar(p){
     jogo.fase = "respondendo";
     Som.toque();
     const j = jogadorDe(jogo.vez);
+    Sala.aoAbrirPergunta();
     return Pergunta.abrir({
       para: j.nome,
       nivel: j.nivel,
@@ -394,9 +410,12 @@ function tocar(p){
           Som.erro();
           avisar("O canto escapou.");
           jogo.vez = outra(jogo.vez);
+          publicar();
+          Sala.aoFecharPergunta();
           return setTimeout(seguirVez, 900);
         }
         executar(m);
+        Sala.aoFecharPergunta();
       }
     });
   }
@@ -419,6 +438,7 @@ function executar(m){
   if(jogo.tab.every(x => x !== null)) return setTimeout(fimDaPartida, 900);
 
   jogo.vez = outra(jogo.vez);
+  publicar();
   setTimeout(seguirVez, 750);
 }
 
@@ -521,7 +541,9 @@ function jogadaDaMaquina(){
    --------------------------------------------------------- */
 
 function fimDaPartida(){
+  if(jogo.fase === "fim" && $("#telaFim").classList.contains("ativa")) return;
   jogo.fase = "fim";
+  publicar();
   const x = contar(jogo.tab, "X"), o = contar(jogo.tab, "O");
   redesenhar();
   Som.vitoria();
@@ -549,10 +571,77 @@ function fimDaPartida(){
 }
 
 /* ---------------------------------------------------------
+   SALA
+   --------------------------------------------------------- */
+
+function souDaVez(){ return Sala.minhaVez(jogo && jogo.vez === "X" ? 0 : 1); }
+
+function retratar(){
+  if(!jogo) return null;
+  return {
+    nomes: cfg.jogadores.map(j => j.nome),
+    niveis: cfg.jogadores.map(j => j.nivel),
+    tab: jogo.tab, vez: jogo.vez, fase: jogo.fase,
+    passouSeguido: jogo.passouSeguido, ultima: jogo.ultima,
+    // sem este aviso, o aparelho que está esperando nunca sabe que acabou
+    acabou: jogo.fase === "fim"
+  };
+}
+
+function aplicarEstado(d){
+  if(!d) return;
+  cfg.jogadores.forEach((j, i) => {
+    j.nome = (d.nomes[i] === "Máquina") ? "Jogador 2" : d.nomes[i];
+    j.nivel = d.niveis[i];
+    j.tipo = "humano";
+  });
+  // primeiro o estado, só depois o desenho: montarTabuleiro() já pinta
+  // as peças, e sem o tabuleiro carregado ele não tem o que pintar
+  const primeiraVez = !jogo;
+  if(primeiraVez) jogo = {virando:[]};
+  Object.assign(jogo, {
+    tab:d.tab, vez:d.vez, fase:"jogar",
+    passouSeguido:d.passouSeguido, ultima:d.ultima, virando:[]
+  });
+  if(primeiraVez){
+    UI.trocarTela("telaJogo");
+    $("#desfecho").innerHTML = "";
+    montarTabuleiro();
+  }
+  if(d.acabou) return fimDaPartida();
+  /* Fora da trava de eco de propósito: seguirVez() pode concluir que o
+     jogador da vez não tem jogada e passar a vez, e essa passagem é uma
+     mudança de verdade, que precisa ser publicada. Dentro da trava, ela
+     morreria aqui e os dois aparelhos ficariam se esperando. */
+  setTimeout(seguirVez, 0);
+}
+
+function publicar(){ Sala.enviar(); }
+
+/* ---------------------------------------------------------
    LIGAÇÕES
    --------------------------------------------------------- */
 
 UI.iniciar({ titulo:"Reversi", versao:VERSAO, regras:REGRAS, voltar:"index.html" });
+
+Sala.montarPainel($("#painelSala"), {
+  jogoId: "reversi", lugares: 2,
+  retratar: retratar, aplicar: aplicarEstado,
+  aoMudarGente: (n) => { if(jogo && jogo.fase !== "fim" && n < 2) avisar("O outro aparelho saiu da sala."); },
+  aoLigar: (lugar) => {
+    cfg.modo = "dupla";
+    cfg.jogadores[1].tipo = "humano";
+    if(cfg.jogadores[1].nome === "Máquina") cfg.jogadores[1].nome = "Jogador 2";
+    montarPreparo();
+    $("#btnComecar").textContent = lugar === 0 ? "Começar (você comanda)" : "Esperando o outro aparelho começar";
+    $("#btnComecar").disabled = lugar !== 0;
+  },
+  aoDesligar: () => {
+    if(Sala.ativa()) Sala.fechar();
+    $("#btnComecar").textContent = "Começar";
+    $("#btnComecar").disabled = false;
+  }
+});
 
 $("#btnComecar").addEventListener("click", comecar);
 $("#btnSair").addEventListener("click", () => UI.trocarTela("telaPreparo"));
