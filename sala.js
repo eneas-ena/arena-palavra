@@ -15,7 +15,7 @@
    não existe tabela nenhuma, não há o que ler nem o que estragar.
    Para trocar de projeto, mude as duas linhas.
    ---------------------------------------------------------
-   sala.js v1.1.0
+   sala.js v1.2.0
    ========================================================= */
 "use strict";
 
@@ -91,7 +91,7 @@ const Sala = {
     });
     let canal = null;
     return {
-      async abrir(codigo, aoReceber, aoMudarGente){
+      abrir(codigo, aoReceber, aoMudarGente){
         canal = cliente.channel("arena-" + codigo, { config: { broadcast: { self:false }, presence: { key: String(Math.random()).slice(2) } } });
         canal.on("broadcast", { event: "estado" }, ({payload}) => aoReceber(payload));
         canal.on("broadcast", { event: "pedido" }, () => aoReceber({pedido:true}));
@@ -99,8 +99,24 @@ const Sala = {
           const gente = canal.presenceState();
           aoMudarGente(Object.keys(gente).length);
         });
-        await canal.subscribe(async (status) => {
-          if(status === "SUBSCRIBED") await canal.track({ entrou: Date.now() });
+
+        /* Esperar de verdade pela inscrição no canal. O subscribe() da
+           biblioteca devolve na hora, sem aguardar a confirmação do
+           servidor — e quem publica antes disso fala sozinho: a mensagem
+           sai antes de o canal existir e ninguém recebe. Era isso que
+           fazia um aparelho jogar sem o outro ver nada. */
+        return new Promise((pronto, falhou) => {
+          const prazo = setTimeout(() => falhou(new Error("o Supabase não confirmou a entrada no canal")), 12000);
+          canal.subscribe(async (status, erro) => {
+            if(status === "SUBSCRIBED"){
+              clearTimeout(prazo);
+              await canal.track({ entrou: Date.now() });
+              pronto();
+            } else if(status === "CHANNEL_ERROR" || status === "TIMED_OUT"){
+              clearTimeout(prazo);
+              falhou(new Error(erro ? erro.message : status));
+            }
+          });
         });
       },
       enviar(evento, dados){ if(canal) canal.send({ type:"broadcast", event:evento, payload:dados }); },
@@ -135,7 +151,16 @@ const Sala = {
 
     await this.transporte.abrir(codigo,
       (msg) => this.receber(msg),
-      (quantos) => { if(this.ganchos.aoMudarGente) this.ganchos.aoMudarGente(quantos); });
+      (quantos) => {
+        /* Rede de segurança: sempre que chega gente, quem abriu a sala
+           reenvia o estado. Se o pedido do recém-chegado se perder,
+           ele recebe a partida assim mesmo. */
+        if(this.souDono && quantos > 1 && this.jogo){
+          const estado = this.jogo.retratar();
+          if(estado) this.publicar(estado);
+        }
+        if(this.ganchos.aoMudarGente) this.ganchos.aoMudarGente(quantos);
+      });
 
     this.ligada = true;
     // quem entra depois pede o estado atual a quem já estava
