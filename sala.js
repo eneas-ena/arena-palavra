@@ -184,10 +184,57 @@ const Sala = {
   },
 
   /* =========================================================
+     ADAPTADOR — o que todo jogo precisa e ninguém deve reescrever
+
+     Três armadilhas moram aqui, e cada uma me custou um bug no
+     jogo da velha:
+       1. eco: aplicar o que veio de fora não pode publicar de volta;
+       2. pergunta aberta: o estado que chega enquanto alguém responde
+          fica guardado e só entra depois;
+       3. comando: botões que fazem a partida avançar (próxima rodada,
+          novo lance) pertencem a um aparelho só, senão avançam dobrado.
+     ========================================================= */
+
+  aplicando: false,
+  respondendo: false,
+  guardado: null,
+  jogo: null,
+
+  /* chamado pelo jogo depois de qualquer mudança que ele mesmo causou */
+  enviar(){
+    if(this.ligada && !this.aplicando && this.jogo)
+      this.publicar(this.jogo.retratar());
+  },
+
+  /* o jogo avisa quando abre e quando fecha uma pergunta */
+  aoAbrirPergunta(){ this.respondendo = true; },
+  aoFecharPergunta(){
+    this.respondendo = false;
+    if(this.guardado){ const g = this.guardado; this.guardado = null; this.receberEstado(g); }
+  },
+
+  receberEstado(d){
+    if(!d || !this.jogo) return;
+    if(this.respondendo){ this.guardado = d; return; }
+    this.aplicando = true;
+    try { this.jogo.aplicar(d); } finally { this.aplicando = false; }
+  },
+
+  /* true quando este aparelho comanda os botões de avançar a partida */
+  comando(){ return !this.ligada || this.meuLugar === 0; },
+
+  /* =========================================================
      O PAINEL DE SALA — igual em todos os jogos
      ========================================================= */
 
   montarPainel(container, op){
+    this.jogo = { retratar: op.retratar, aplicar: op.aplicar };
+    op.ganchos = {
+      aoReceberEstado: (e) => this.receberEstado(e),
+      aoPedirEstado:   () => op.retratar(),
+      aoMudarGente:    (n) => { if(op.aoMudarGente) op.aoMudarGente(n); }
+    };
+
     const bloco = document.createElement("div");
     bloco.className = "bloco";
     bloco.innerHTML =

@@ -314,6 +314,7 @@ function montarCasas(){
 }
 
 function novaRodada(primeira){
+  jogo.rodadaFechada = false;
   jogo.casas = Array(9).fill(null);
   jogo.vez = jogo.comeca;
   jogo.fase = "escolher";
@@ -380,6 +381,8 @@ function avisar(txt){ $("#aviso").textContent = txt || ""; }
 
 function escolherCasa(i){
   if(jogo.fase !== "escolher") return;
+  // a trava fica aqui, e não no botão
+  if(!souDaVez()) return;
   if(jogo.casas[i] !== null) return;
 
   jogo.fase = "respondendo";
@@ -389,7 +392,7 @@ function escolherCasa(i){
   travarCasas(true);
 
   const j = jogadorDe(jogo.vez);
-  esperandoResposta = true;
+  Sala.aoAbrirPergunta();
   Pergunta.abrir({
     para: j.nome,
     nivel: j.nivel,
@@ -397,10 +400,8 @@ function escolherCasa(i){
       ? "Resposta certa. A casa é sua."
       : "Resposta errada. A casa fica livre e a vez passa.",
     aoResponder: (acertou) => {
-      esperandoResposta = false;
       resolver(acertou);
-      // se chegou estado do outro aparelho enquanto eu respondia, ele manda
-      if(estadoGuardado){ const g = estadoGuardado; estadoGuardado = null; restaurar(g); }
+      Sala.aoFecharPergunta();
     }
   });
 }
@@ -429,6 +430,7 @@ function resolver(acertou){
     jogo.casas[i] = jogo.vez;
     desenharMarca(i, jogo.vez);
     Som.marcar();
+    publicar();   // o outro aparelho vê a marca aparecer na hora
   }
 
   const venc = vencedor(jogo.casas);
@@ -515,12 +517,13 @@ function fimDaRodada(marca, linha, contar){
 
   if(marca){
     riscarLinha(linha);
-    if(contar !== false) jogo.pontos[marca]++;
+    if(contar !== false){ jogo.pontos[marca]++; jogo.rodadaFechada = true; }
     frase.textContent = jogadorDe(marca).nome + " ganhou a rodada";
     frase.classList.add("venceu");
     Som.chegou();
   } else {
     frase.textContent = "Deu velha";
+    if(contar !== false) jogo.rodadaFechada = true;
     Som.empate();
   }
 
@@ -535,7 +538,7 @@ function fimDaRodada(marca, linha, contar){
   b.className = "principal";
   // numa sala, só quem abriu comanda a passagem de rodada:
   // se os dois pudessem apertar, a rodada avançaria duas vezes
-  const comando = !Sala.ativa() || Sala.meuLugar === 0;
+  const comando = Sala.comando();
   b.textContent = comando ? "Próxima rodada" : "Aguardando a próxima rodada…";
   b.disabled = !comando;
   if(comando) b.addEventListener("click", () => {
@@ -631,13 +634,6 @@ function souDaVez(){
   return !Sala.ativa() || Sala.minhaVez(lugarDaVez());
 }
 
-/* Enquanto o aparelho está aplicando o estado que veio do outro,
-   ele não publica nada. Sem esta trava, um lado aplica, publica,
-   o outro aplica, publica de volta — e a partida dispara sozinha. */
-let aplicandoRemoto = false;
-let esperandoResposta = false;
-let estadoGuardado = null;
-
 function retratar(){
   if(!jogo) return null;
   return {
@@ -649,16 +645,9 @@ function retratar(){
     comeca: jogo.comeca,
     casas: jogo.casas,
     vez: jogo.vez,
+    fechada: !!jogo.rodadaFechada,
     fase: jogo.fase === "respondendo" ? "escolher" : jogo.fase
   };
-}
-
-function restaurar(d){
-  if(!d) return;
-  // se a pergunta está aberta aqui, guarda para aplicar depois de respondida
-  if(esperandoResposta){ estadoGuardado = d; return; }
-  aplicandoRemoto = true;
-  try { aplicarEstado(d); } finally { aplicandoRemoto = false; }
 }
 
 function aplicarEstado(d){
@@ -677,6 +666,7 @@ function aplicarEstado(d){
   jogo.vez = d.vez;
   jogo.fase = d.fase;
   jogo.pendente = null;
+  jogo.rodadaFechada = !!d.fechada;
 
   $("#marcas").innerHTML = "";
   $("#risco").innerHTML = "";
@@ -684,23 +674,17 @@ function aplicarEstado(d){
   d.casas.forEach((m, i) => { if(m) desenharMarca(i, m); });
 
   const venc = vencedor(jogo.casas);
+  const cheio = jogo.casas.every(c => c !== null);
+  if((venc || cheio) && !d.fechada){
+    travarCasas(true);
+    return avisar("Rodada encerrada. Aguardando o outro aparelho…");
+  }
   if(venc) return fimDaRodada(venc.marca, venc.linha, false);
-  if(jogo.casas.every(c => c !== null)) return fimDaRodada(null, null, false);
+  if(cheio) return fimDaRodada(null, null, false);
   seguirVez();
 }
 
-function publicar(){
-  if(Sala.ativa() && !aplicandoRemoto) Sala.publicar(retratar());
-}
-
-const GANCHOS_SALA = {
-  aoReceberEstado: (e) => restaurar(e),
-  aoPedirEstado: () => retratar(),
-  aoMudarGente: (n) => {
-    if(jogo && jogo.fase !== "fim" && n < 2)
-      avisar("O outro aparelho saiu da sala.");
-  }
-};
+function publicar(){ Sala.enviar(); }
 
 /* ---------------------------------------------------------
    LIGAÇÕES
@@ -716,7 +700,9 @@ UI.iniciar({
 Sala.montarPainel($("#painelSala"), {
   jogoId: "velha",
   lugares: 2,
-  ganchos: GANCHOS_SALA,
+  retratar: retratar,
+  aplicar: aplicarEstado,
+  aoMudarGente: (n) => { if(jogo && jogo.fase !== "fim" && n < 2) avisar("O outro aparelho saiu da sala."); },
   aoLigar: (lugar) => {
     // numa sala os dois são pessoas, e só o dono aperta "Começar"
     cfg.modo = "dupla";

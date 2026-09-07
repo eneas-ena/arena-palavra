@@ -104,6 +104,8 @@
     <p class="legenda" style="margin:14px 0 0" id="legendaRodadas">—</p>
   </div>
 
+  <div id="painelSala"></div>
+
   <button class="principal" id="btnComecar">Começar</button>
 </section>
 
@@ -139,6 +141,7 @@
 
 <script src="perguntas.js"></script>
 <script src="comum.js"></script>
+<script src="sala.js"></script>
 <script>
 "use strict";
 
@@ -148,7 +151,7 @@
    v1.0.0
    ========================================================= */
 
-const VERSAO = "1.0.2";
+const VERSAO = "1.1.0";
 const COLS = 7, LINS = 6;
 
 const REGRAS = `
@@ -247,6 +250,7 @@ function comecar(){
   UI.trocarTela("telaJogo");
   montarPainel();
   novaRodada();
+  publicar();
 }
 
 function jogadorDe(m){ return cfg.jogadores.find(j => j.marca === m); }
@@ -277,6 +281,7 @@ function realcar(c, ligar){
 }
 
 function novaRodada(){
+  jogo.rodadaFechada = false;
   jogo.casas = Array(COLS * LINS).fill(null);
   jogo.vez = jogo.comeca;
   jogo.fase = "escolher";
@@ -305,6 +310,10 @@ function atualizarPlacar(){
 function seguirVez(){
   atualizarPlacar();
   const j = jogadorDe(jogo.vez);
+  if(Sala.ativa() && !souDaVez()){
+    travar(true);
+    return avisar("Aguardando " + j.nome + " jogar no outro aparelho…");
+  }
   if(j.tipo === "maquina"){
     travar(true);
     avisar(j.nome + " está pensando…");
@@ -335,6 +344,9 @@ function alturaLivre(casas, c){
 
 function escolherColuna(c){
   if(jogo.fase !== "escolher") return;
+  // a trava fica aqui, e não no botão: se o estado do outro aparelho
+  // chega com um instante de atraso, a tela ainda pode estar liberada
+  if(!souDaVez()) return;
   if(alturaLivre(jogo.casas, c) < 0) return;
 
   jogo.fase = "respondendo";
@@ -344,11 +356,12 @@ function escolherColuna(c){
   furosDa(c).forEach(f => f.classList.add("alvo"));
 
   const j = jogadorDe(jogo.vez);
+  Sala.aoAbrirPergunta();
   Pergunta.abrir({
     para: j.nome,
     nivel: j.nivel,
     texto: a => a ? "Resposta certa. A peça cai." : "Resposta errada. Nada cai e a vez passa.",
-    aoResponder: (acertou) => resolver(acertou)
+    aoResponder: (acertou) => { resolver(acertou); Sala.aoFecharPergunta(); }
   });
 }
 
@@ -370,6 +383,7 @@ function jogadaDaMaquina(){
 function resolver(acertou){
   const c = jogo.pendente;
   $$("#painel .furo").forEach(f => f.classList.remove("alvo","realce"));
+  if(c === null || c === undefined) return seguirVez();
 
   if(acertou){
     const l = alturaLivre(jogo.casas, c);
@@ -377,6 +391,7 @@ function resolver(acertou){
       jogo.casas[idx(l,c)] = jogo.vez;
       soltarDisco(l, c, jogo.vez);
       Som.marcar();
+      publicar();   // o outro aparelho vê a peça cair na hora
     }
   }
 
@@ -386,6 +401,7 @@ function resolver(acertou){
 
   jogo.vez = jogo.vez === "X" ? "O" : "X";
   jogo.fase = "escolher";
+  publicar();
   setTimeout(seguirVez, 320);
 }
 
@@ -427,7 +443,7 @@ function vencedor(casas){
 
 /* ---------- fim ---------- */
 
-function fimDaRodada(marca, casasVencedoras){
+function fimDaRodada(marca, casasVencedoras, contar){
   jogo.fase = "parado";
   travar(true);
   avisar("");
@@ -442,31 +458,36 @@ function fimDaRodada(marca, casasVencedoras){
       const d = $('#painel .furo[data-l="' + l + '"][data-c="' + c + '"] .disco');
       if(d) d.classList.add("venceu");
     });
-    jogo.pontos[marca]++;
+    if(contar !== false){ jogo.pontos[marca]++; jogo.rodadaFechada = true; }
     frase.textContent = jogadorDe(marca).nome + " ligou quatro";
     frase.classList.add("venceu");
     Som.chegou();
   } else {
     frase.textContent = "Painel cheio, ninguém ligou quatro";
+    if(contar !== false) jogo.rodadaFechada = true;
     Som.empate();
   }
 
   atualizarPlacar();
   cx.appendChild(frase);
+  publicar();
 
   if(jogo.pontos.X >= cfg.alvo || jogo.pontos.O >= cfg.alvo)
     return setTimeout(fimDaPartida, 1500);
 
   const b = document.createElement("button");
   b.className = "principal";
-  b.textContent = "Próxima rodada";
-  b.addEventListener("click", () => {
+  const comando = Sala.comando();
+  b.textContent = comando ? "Próxima rodada" : "Aguardando a próxima rodada…";
+  b.disabled = !comando;
+  if(comando) b.addEventListener("click", () => {
     jogo.rodada++;
     jogo.comeca = jogo.comeca === "X" ? "O" : "X";
     novaRodada();
+    publicar();
   });
   cx.appendChild(b);
-  b.focus();
+  if(comando) b.focus();
 }
 
 function fimDaPartida(){
@@ -584,10 +605,84 @@ function escolhaDaMaquina(j){
 }
 
 /* ---------------------------------------------------------
+   SALA
+   --------------------------------------------------------- */
+
+function lugarDaVez(){ return jogo && jogo.vez === "X" ? 0 : 1; }
+function souDaVez(){ return Sala.minhaVez(lugarDaVez()); }
+
+function retratar(){
+  if(!jogo) return null;
+  return {
+    alvo: cfg.alvo,
+    nomes: cfg.jogadores.map(j => j.nome),
+    niveis: cfg.jogadores.map(j => j.nivel),
+    pontos: jogo.pontos, rodada: jogo.rodada, comeca: jogo.comeca,
+    casas: jogo.casas, vez: jogo.vez,
+    // "fechada" evita que o outro aparelho avance a rodada antes de
+    // ela ter sido contada aqui: enquanto for falso, ele só assiste
+    fechada: !!jogo.rodadaFechada,
+    fase: jogo.fase === "respondendo" ? "escolher" : jogo.fase
+  };
+}
+
+function aplicarEstado(d){
+  if(!d) return;
+  cfg.alvo = d.alvo;
+  cfg.jogadores.forEach((j, i) => {
+    j.nome = (d.nomes[i] === "Máquina") ? "Jogador 2" : d.nomes[i];
+    j.nivel = d.niveis[i];
+    j.tipo = "humano";
+  });
+  if(!jogo){ jogo = {}; UI.trocarTela("telaJogo"); montarPainel(); }
+  Object.assign(jogo, {
+    pontos:d.pontos, rodada:d.rodada, comeca:d.comeca,
+    casas:d.casas, vez:d.vez, fase:d.fase, pendente:null,
+    rodadaFechada: !!d.fechada
+  });
+  $("#resultadoRodada").innerHTML = "";
+  $$("#painel .furo").forEach(f => { f.innerHTML = ""; f.classList.remove("alvo","realce"); });
+  for(let p = 0; p < COLS*LINS; p++){
+    if(jogo.casas[p]) soltarDisco(Math.floor(p / COLS), p % COLS, jogo.casas[p]);
+  }
+  const venc = vencedor(jogo.casas);
+  const cheio = jogo.casas.every(x => x !== null);
+  if((venc || cheio) && !d.fechada){
+    // a rodada acabou no outro aparelho mas ainda não foi contada lá
+    travar(true);
+    return avisar("Rodada encerrada. Aguardando o outro aparelho…");
+  }
+  if(venc) return fimDaRodada(venc.marca, venc.casas, false);
+  if(cheio) return fimDaRodada(null, null, false);
+  seguirVez();
+}
+
+function publicar(){ Sala.enviar(); }
+
+/* ---------------------------------------------------------
    LIGAÇÕES
    --------------------------------------------------------- */
 
 UI.iniciar({ titulo:"Lig 4", versao:VERSAO, regras:REGRAS, voltar:"index.html" });
+
+Sala.montarPainel($("#painelSala"), {
+  jogoId: "lig4", lugares: 2,
+  retratar: retratar, aplicar: aplicarEstado,
+  aoMudarGente: (n) => { if(jogo && jogo.fase !== "fim" && n < 2) avisar("O outro aparelho saiu da sala."); },
+  aoLigar: (lugar) => {
+    cfg.modo = "dupla";
+    cfg.jogadores[1].tipo = "humano";
+    if(cfg.jogadores[1].nome === "Máquina") cfg.jogadores[1].nome = "Jogador 2";
+    montarPreparo();
+    $("#btnComecar").textContent = lugar === 0 ? "Começar (você comanda)" : "Esperando o outro aparelho começar";
+    $("#btnComecar").disabled = lugar !== 0;
+  },
+  aoDesligar: () => {
+    if(Sala.ativa()) Sala.fechar();
+    $("#btnComecar").textContent = "Começar";
+    $("#btnComecar").disabled = false;
+  }
+});
 
 $("#btnComecar").addEventListener("click", comecar);
 $("#btnSair").addEventListener("click", () => UI.trocarTela("telaPreparo"));
