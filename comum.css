@@ -28,9 +28,11 @@ html,body{margin:0;padding:0}
 /* No iPhone, dois toques rápidos dão zoom na página — e num jogo de
    tabuleiro isso acontece o tempo todo. "manipulation" desliga só o
    duplo toque, mantendo o arrastar e o pinçar para ampliar. */
-html{touch-action:manipulation}
-button, .casa, .ponta, .furo, .peca, .pedra, .disco, .carta, .tecla,
-.escolha, .alternativa, .suspeito, [role="button"]{ touch-action:manipulation }
+/* Em todos os elementos, sem exceção: no iOS o duplo toque só é
+   ignorado se a propriedade estiver no próprio elemento tocado ou
+   num ancestral, e listar seletores um a um sempre deixa algum de fora.
+   "manipulation" mantém o arrastar e o pinçar para ampliar. */
+*{touch-action:manipulation}
 body{
   background:var(--bg); color:var(--ink);
   font-family:'Cormorant Garamond',Georgia,serif; font-size:18px; line-height:1.5;

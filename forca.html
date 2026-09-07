@@ -366,7 +366,8 @@ function novaPalavra(){
   desenharPalavra();
   montarTeclado();
   atualizarFaixa();
-  avisar(cfg.qtd === 1 ? "Escolha uma letra." : atual().nome + ", escolha uma letra.");
+  publicar();      // sem isto, o outro aparelho não sabe que a partida começou
+  seguirTurno();
 }
 
 function atualizarFaixa(){

@@ -104,6 +104,8 @@
     <div id="listaJogadores"></div>
   </div>
 
+  <div id="painelSala"></div>
+
   <button class="principal" id="btnComecar">Começar</button>
 </section>
 
@@ -145,6 +147,7 @@
 
 <script src="personagens.js"></script>
 <script src="comum.js"></script>
+<script src="sala.js"></script>
 <script>
 "use strict";
 
@@ -155,7 +158,7 @@
    v1.0.0
    ========================================================= */
 
-const VERSAO = "1.0.0";
+const VERSAO = "1.1.0";
 const VALOR = [5, 4, 3, 2, 1];       // pontos conforme a pista em que você acerta
 const SUSPEITOS = 6;                  // nomes na lista de palpites
 
@@ -293,6 +296,8 @@ function novaFicha(){
   jogo.riscados = [];
   jogo.fase = "pista";
 
+  jogo.desfecho = null;
+
   $("#grupo").textContent = GRUPOS[ficha.g] || "Bíblia";
   $("#suspeitos").style.display = "none";
   $("#veredito").innerHTML = "";
@@ -302,9 +307,8 @@ function novaFicha(){
 
   desenharPistas();
   atualizarFaixa();
-  avisar(cfg.qtd === 1
-    ? "Rodada " + jogo.rodada + " de " + cfg.rodadas + "."
-    : j.nome + ", é a sua vez. Rodada " + jogo.rodada + " de " + cfg.rodadas + ".");
+  publicar();
+  seguirTurno();
 }
 
 function desenharPistas(){
@@ -333,14 +337,17 @@ function avisar(t){ $("#aviso").textContent = t || ""; }
 
 function maisUmaPista(){
   if(jogo.fase !== "pista" || jogo.pistas >= 5) return;
+  if(!souDaVez()) return;
   jogo.pistas++;
   Som.toque();
   desenharPistas();
+  publicar();
   if(jogo.pistas >= 5) avisar("Última pista. Agora é arriscar ou passar.");
 }
 
 function abrirSuspeitos(){
   if(jogo.fase === "fim") return;
+  if(!souDaVez()) return;
   jogo.fase = "palpite";
   Som.toque();
   $("#botoes").style.display = "none";
@@ -361,6 +368,7 @@ function abrirSuspeitos(){
 
 function palpitar(nome, botao){
   if(jogo.fase !== "palpite") return;
+  if(!souDaVez()) return;
 
   if(nome === jogo.ficha.n){
     jogo.fase = "fim-rodada";
@@ -377,6 +385,7 @@ function palpitar(nome, botao){
   botao.classList.add("riscado");
   botao.disabled = true;
   Som.erro();
+  publicar();
 
   if(jogo.pistas >= 5){
     jogo.fase = "fim-rodada";
@@ -393,6 +402,14 @@ function palpitar(nome, botao){
 }
 
 function fecharRodada(acertou, ganhos){
+  jogo.desfecho = {acertou, ganhos, pistas: jogo.pistas, nome: atual().nome,
+                   personagem: jogo.ficha.n, ref: jogo.ficha.r};
+  publicar();
+  mostrarVeredito(jogo.desfecho);
+}
+
+function mostrarVeredito(v){
+  const acertou = v.acertou, ganhos = v.ganhos;
   $("#botoes").style.display = "none";
   avisar("");
 
@@ -402,15 +419,15 @@ function fecharRodada(acertou, ganhos){
   cartao.className = "veredito";
   const nome = document.createElement("span");
   nome.className = "nome";
-  nome.textContent = jogo.ficha.n;
+  nome.textContent = v.personagem;
   const conta = document.createElement("span");
   conta.className = "conta";
   conta.textContent = acertou
-    ? atual().nome + " acertou com " + jogo.pistas + (jogo.pistas === 1 ? " pista" : " pistas") + ": " + ganhos + (ganhos === 1 ? " ponto" : " pontos")
+    ? v.nome + " acertou com " + v.pistas + (v.pistas === 1 ? " pista" : " pistas") + ": " + ganhos + (ganhos === 1 ? " ponto" : " pontos")
     : "Ninguém acertou desta vez.";
   const ref = document.createElement("span");
   ref.className = "ref";
-  ref.textContent = jogo.ficha.r;
+  ref.textContent = v.ref;
   cartao.append(nome, conta, ref);
   cx.appendChild(cartao);
 
@@ -422,8 +439,11 @@ function fecharRodada(acertou, ganhos){
   const b = document.createElement("button");
   b.className = "principal";
   b.style.marginTop = "12px";
-  b.textContent = acabou ? "Ver o resultado" : "Continuar";
-  b.addEventListener("click", () => {
+  // quem acabou de jogar é quem segue; o outro aparelho apenas acompanha
+  const meu = !Sala.ativa() || souDaVez();
+  b.textContent = acabou ? "Ver o resultado" : (meu ? "Continuar" : "Aguardando o outro aparelho…");
+  b.disabled = !meu && !acabou;
+  if(meu || acabou) b.addEventListener("click", () => {
     if(acabou) return fimDaPartida();
     if(ultimaVez) jogo.rodada++;
     jogo.vez = (jogo.vez + 1) % cfg.jogadores.length;
@@ -431,7 +451,7 @@ function fecharRodada(acertou, ganhos){
     novaFicha();
   });
   cx.appendChild(b);
-  b.focus();
+  if(meu || acabou) b.focus();
 }
 
 /* ---------- fim ---------- */
@@ -472,10 +492,88 @@ function fimDaPartida(){
 }
 
 /* ---------------------------------------------------------
+   SALA
+   --------------------------------------------------------- */
+
+function souDaVez(){ return Sala.minhaVez(jogo ? jogo.vez : 0); }
+
+function retratar(){
+  if(!jogo || !jogo.ficha) return null;
+  return {
+    rodadas: cfg.rodadas,
+    nomes: cfg.jogadores.map(j => j.nome),
+    niveis: cfg.jogadores.map(j => j.nivel),
+    pontos: cfg.jogadores.map(j => j.pontos),
+    rodada: jogo.rodada, vez: jogo.vez,
+    ficha: jogo.ficha, pistas: jogo.pistas,
+    suspeitos: jogo.suspeitos, riscados: jogo.riscados,
+    fase: jogo.fase === "palpite" ? "pista" : jogo.fase,
+    desfecho: jogo.desfecho || null
+  };
+}
+
+function aplicarEstado(d){
+  if(!d) return;
+  cfg.rodadas = d.rodadas;
+  if(cfg.jogadores.length !== d.nomes.length){
+    cfg.jogadores = d.nomes.map((n, i) => ({nome:n, nivel:d.niveis[i], cor:CORES_JOGADOR[i], pontos:d.pontos[i]}));
+    cfg.qtd = d.nomes.length;
+  }
+  cfg.jogadores.forEach((j, i) => { j.nome = d.nomes[i]; j.nivel = d.niveis[i]; j.pontos = d.pontos[i]; });
+
+  const primeira = !jogo;
+  if(primeira){ jogo = {}; UI.trocarTela("telaJogo"); montarFaixa(); }
+  Object.assign(jogo, {
+    rodada:d.rodada, vez:d.vez, ficha:d.ficha, pistas:d.pistas,
+    suspeitos:d.suspeitos, riscados:d.riscados, fase:d.fase,
+    desfecho:d.desfecho
+  });
+
+  $("#grupo").textContent = GRUPOS[jogo.ficha.g] || "Bíblia";
+  $("#suspeitos").style.display = "none";
+  $("#veredito").innerHTML = "";
+  desenharPistas();
+  atualizarFaixa();
+
+  if(jogo.desfecho) return mostrarVeredito(jogo.desfecho);
+  seguirTurno();
+}
+
+function seguirTurno(){
+  const j = atual();
+  const meu = !Sala.ativa() || souDaVez();
+  $("#botoes").style.display = meu ? "flex" : "none";
+  $("#btnArriscar").disabled = !meu;
+  if(!meu) return avisar("Aguardando " + j.nome + " no outro aparelho…");
+  avisar(cfg.jogadores.length === 1
+    ? "Rodada " + jogo.rodada + " de " + cfg.rodadas + "."
+    : j.nome + ", é a sua vez. Rodada " + jogo.rodada + " de " + cfg.rodadas + ".");
+}
+
+function publicar(){ Sala.enviar(); }
+
+/* ---------------------------------------------------------
    LIGAÇÕES
    --------------------------------------------------------- */
 
 UI.iniciar({ titulo:"Quem Sou Eu", versao:VERSAO, regras:REGRAS, voltar:"index.html" });
+
+Sala.montarPainel($("#painelSala"), {
+  jogoId: "quemsoueu", lugares: 2,
+  retratar: retratar, aplicar: aplicarEstado,
+  aoMudarGente: (n) => { if(jogo && jogo.fase !== "fim" && n < 2) avisar("O outro aparelho saiu da sala."); },
+  aoLigar: (lugar) => {
+    cfg.qtd = 2;
+    montarPreparo();
+    $("#btnComecar").textContent = lugar === 0 ? "Começar (você comanda)" : "Esperando o outro aparelho começar";
+    $("#btnComecar").disabled = lugar !== 0;
+  },
+  aoDesligar: () => {
+    if(Sala.ativa()) Sala.fechar();
+    $("#btnComecar").textContent = "Começar";
+    $("#btnComecar").disabled = false;
+  }
+});
 
 $("#btnComecar").addEventListener("click", comecar);
 $("#btnMaisUma").addEventListener("click", maisUmaPista);
