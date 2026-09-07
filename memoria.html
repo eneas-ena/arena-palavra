@@ -178,7 +178,7 @@
    v1.0.0
    ========================================================= */
 
-const VERSAO = "1.3.1";
+const VERSAO = "1.5.0";
 
 /* Mesa maior exige pergunta mais curta, senão o texto não cabe na carta. */
 const MESAS = {
@@ -394,7 +394,7 @@ function comecar(){
 
   UI.trocarTela("telaJogo");
   $("#ultimo").classList.remove("aparece");
-  montarMesa(m.colunas);
+  montarMesa(melhorColunas(cartas.length));
   montarFaixa();
   publicar();
   seguirVez();
@@ -435,7 +435,56 @@ function montarMesa(colunas){
     });
     mesa.appendChild(b);
   });
+  ajustarMesa(colunas);
   ajustarTodos();
+}
+
+/* Limita a mesa também pela altura disponível.
+   Com poucas colunas, calcular só pela largura deixa a carta enorme e
+   a mesa passa da tela: era preciso rolar para ver as de baixo. Aqui a
+   largura da mesa é a menor entre o limite da coluna e o que faz todas
+   as fileiras caberem na altura que sobra. */
+/* Escolhe quantas colunas rendem a maior carta nesta tela.
+   Duas colunas com oito cartas parece generoso, mas gera quatro
+   fileiras altas que não cabem no celular em pé — e a carta acaba
+   menor do que ficaria com três colunas. */
+function melhorColunas(total){
+  const mesa = $("#mesa");
+  const larguraPai = (mesa.parentElement ? mesa.parentElement.clientWidth : 0) || 360;
+  const topo = mesa.getBoundingClientRect().top;
+  const alturaUtil = Math.max(220, window.innerHeight - (topo > 0 ? topo : 300) - 176);
+  const vao = window.innerWidth <= 360 ? 5 : 7;
+
+  let melhor = 3, maior = 0;
+  [2, 3, 4].forEach(c => {
+    const fileiras = Math.ceil(total / c);
+    const porLargura = (Math.min(larguraPai, 460) - (c - 1) * vao) / c;
+    const porAltura  = ((alturaUtil - (fileiras - 1) * vao) / fileiras) / 1.25;
+    const lado = Math.min(porLargura, porAltura);
+    if(lado > maior){ maior = lado; melhor = c; }
+  });
+  return melhor;
+}
+
+function ajustarMesa(colunas){
+  const mesa = $("#mesa");
+  const cartas = mesa.children.length;
+  if(!cartas) return;
+  const fileiras = Math.ceil(cartas / colunas);
+  const vao = window.innerWidth <= 360 ? 5 : 7;
+
+  const topo = mesa.getBoundingClientRect().top;
+  if(topo <= 0) return;                       // ainda sem layout
+  const abaixo = 176;                         // aviso, último par e botão de sair
+  const alturaUtil = Math.max(220, window.innerHeight - topo - abaixo);
+
+  // altura da carta = largura * 1.25 (proporção 4 por 5)
+  const alturaCarta = (alturaUtil - (fileiras - 1) * vao) / fileiras;
+  const larguraCarta = alturaCarta / 1.25;
+  const porAltura = Math.floor(larguraCarta * colunas + (colunas - 1) * vao);
+
+  const tetos = {2:300, 3:390, 4:460};
+  mesa.style.maxWidth = Math.max(150, Math.min(tetos[colunas] || 460, porAltura)) + "px";
 }
 
 /* Faz a letra de cada carta crescer até o texto encostar nas bordas.
@@ -466,7 +515,20 @@ function ajustarTodos(){
 let releitura = null;
 window.addEventListener("resize", () => {
   clearTimeout(releitura);
-  releitura = setTimeout(() => { if(jogo) ajustarTodos(); }, 180);
+  releitura = setTimeout(() => {
+    if(!jogo) return;
+    // ao girar o aparelho, o melhor número de colunas pode mudar
+    const colunas = melhorColunas(jogo.cartas.length);
+    const abertas = $$("#mesa .carta.aberta").map(c => Number(c.dataset.i));
+    const achadas = $$("#mesa .carta.achada").map(c => Number(c.dataset.i));
+    montarMesa(colunas);
+    $$("#mesa .carta").forEach((c, i) => {
+      if(abertas.includes(i)) c.classList.add("aberta");
+      if(achadas.includes(i)) c.classList.add("achada");
+    });
+    travar(jogo.fase !== "escolher");
+    ajustarTodos();
+  }, 180);
 });
 
 function montarFaixa(){
@@ -778,7 +840,7 @@ function aplicarEstado(d){
   jogo.tentativas = d.tentativas;
   jogo.fase = d.acabou ? "fim" : "escolher";
 
-  montarMesa(d.colunas);
+  montarMesa(melhorColunas(d.total));
   jogo.abertas.concat([...jogo.achadas]).forEach(i => {
     const carta = $$("#mesa .carta")[i];
     if(carta) carta.classList.add("aberta");
