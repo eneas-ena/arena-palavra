@@ -138,7 +138,7 @@
    v1.0.0
    ========================================================= */
 
-const VERSAO = "1.1.0";
+const VERSAO = "1.1.1";
 const PECAS = 9;
 const LANCES_SEM_PROGRESSO = 40;   // sem nenhuma peça sair, a partida empata
 
@@ -475,6 +475,9 @@ function tocarPonto(i){
 
 function executar(mov){
   const marca = jogo.vez;
+  /* Fecha o tabuleiro na hora. Entre a jogada e a troca de vez existe
+     meio segundo, e sem esta trava um toque rápido coloca duas peças. */
+  jogo.fase = "movendo";
   if(mov.de !== undefined){ jogo.tab[mov.de] = null; jogo.semProgresso++; }
   else { jogo.naMao[marca]--; jogo.semProgresso = 0; }
   jogo.tab[mov.para] = marca;
@@ -542,11 +545,11 @@ function executar(mov){
 function trocarVez(){
   if(jogo.fase === "fim") return;
   jogo.ultimoMoinho = null;
-  publicar();
   if(jogo.semProgresso >= LANCES_SEM_PROGRESSO)
     return fimDaPartida(null, "quarenta lances sem nenhuma peça sair do tabuleiro");
   jogo.vez = outra(jogo.vez);
-  seguirVez();
+  publicar();   // depois de trocar a vez, nunca antes:
+  seguirVez();  // senão o outro aparelho nunca sabe que chegou a vez dele
 }
 
 /* ---------------------------------------------------------
