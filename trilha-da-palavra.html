@@ -268,7 +268,7 @@ main{max-width:560px;margin:0 auto;padding:18px 16px 40px}
 <header>
   <a class="voltar" href="index.html" aria-label="Voltar à Arena">‹</a>
   <h1>Trilha da Palavra</h1>
-  <span class="versao">v1.1.2</span>
+  <span class="versao">v1.2.0</span>
   <button class="icone-btn" id="btnRegras" aria-label="Ver as regras">?</button>
   <button class="icone-btn" id="btnSom" aria-label="Desligar o som">🔊</button>
   <button class="icone-btn" id="btnTema" aria-label="Alternar tema claro e escuro">☀️</button>
@@ -310,6 +310,8 @@ main{max-width:560px;margin:0 auto;padding:18px 16px 40px}
       </span>
     </label>
   </div>
+
+  <div id="painelSala"></div>
 
   <button class="principal" id="btnComecar">Começar a partida</button>
 </section>
@@ -401,6 +403,7 @@ main{max-width:560px;margin:0 auto;padding:18px 16px 40px}
   </div>
 </div>
 
+<script src="sala.js"></script>
 <script>
 "use strict";
 
@@ -410,7 +413,7 @@ main{max-width:560px;margin:0 auto;padding:18px 16px 40px}
    Fase 2 (a fazer): sincronia entre celulares via Supabase Realtime.
    ======================================================================= */
 
-const VERSAO = "1.1.2";
+const VERSAO = "1.2.0";
 
 /* ----------------------------------------------------------------------
    0. SOM
@@ -814,6 +817,7 @@ function comecarPartida(){
 
   construirTabuleiro();
   trocarTela("telaJogo");
+  publicar();
   iniciarVez();
 }
 
@@ -971,6 +975,12 @@ function iniciarVez(){
   // jogador que já terminou é pulado
   if(j.terminouEm !== null){ return passarVez(); }
 
+  if(Sala.ativa() && !souDaVez()){
+    $("#btnRolar").disabled = true;
+    atualizarPainel();
+    return avisar("Aguardando " + j.nome + " no outro aparelho…");
+  }
+
   atualizarPainel();
   jogo.dado = null;
   mostrarDado(null);
@@ -1016,6 +1026,7 @@ function mostrarDado(v){
 }
 
 function rolarDado(){
+  if(!souDaVez()) return;
   $("#btnRolar").disabled = true;
   const d = $("#dado");
   d.classList.add("rolando");
@@ -1026,6 +1037,7 @@ function rolarDado(){
     jogo.dado = v;
     mostrarDado(v);
     Som.dadoParou();
+    publicar();   // o dado sorteado vale para todos os aparelhos
     setTimeout(fazerPergunta, 450);
   }, 520);
 }
@@ -1071,6 +1083,7 @@ function fazerPergunta(){
     cx.appendChild(b);
   });
 
+  Sala.aoAbrirPergunta();
   $("#cortina").classList.add("ativa");
   const primeiro = cx.querySelector("button");
   if(primeiro) primeiro.focus();
@@ -1097,6 +1110,7 @@ function responder(escolha, q, cx){
   $("#btnContinuar").onclick = () => {
     $("#cortina").classList.remove("ativa");
     resolverResposta(acertou);
+    Sala.aoFecharPergunta();
   };
 }
 
@@ -1134,6 +1148,7 @@ function resolverResposta(acertou){
 
 function escolherPeca(indice){
   if(jogo.fase !== "escolher") return;
+  if(!souDaVez()) return;
   const m = jogo.movimentos.find(x => x.peca === indice);
   if(!m) return;
   jogo.fase = "movendo";
@@ -1236,6 +1251,7 @@ function aplicarMovimento(m){
     }
 
     atualizarPainel();
+    publicar();
     setTimeout(() => terminarJogada(true), capturadas > 0 ? 1200 : 550);
   };
 
@@ -1287,6 +1303,8 @@ function passarVez(){
     jogo.vez = (jogo.vez + 1) % jogo.jogadores.length;
     volta++;
   } while(jogo.jogadores[jogo.vez].terminouEm !== null && volta < 10);
+  jogo.dado = null;
+  publicar();   // depois de trocar a vez, nunca antes
   setTimeout(iniciarVez, 250);
 }
 
@@ -1320,6 +1338,9 @@ function escolhaDaMaquina(j, movimentos){
 /* ---------- fim ---------- */
 
 function fimDeJogo(){
+  if(jogo.fase === "fim" && $("#telaFim").classList.contains("ativa")) return;
+  jogo.fase = "fim";
+  publicar();
   jogo.jogadores.forEach(j => { if(j.terminouEm === null) j.terminouEm = jogo.colocacao++; });
   const ordem = jogo.jogadores.slice().sort((a,b) => a.terminouEm - b.terminouEm);
   const campeao = ordem[0];
@@ -1345,6 +1366,66 @@ function fimDeJogo(){
 
   trocarTela("telaFim");
 }
+
+/* ----------------------------------------------------------------------
+   7b. SALA ENTRE APARELHOS
+   ---------------------------------------------------------------------- */
+
+function souDaVez(){ return Sala.minhaVez(jogo ? jogo.vez : 0); }
+
+function retratar(){
+  if(!jogo) return null;
+  return {
+    qtdPecas: cfg.qtdPecas, comer: cfg.comer, rigoroso: cfg.rigoroso,
+    jogadores: jogo.jogadores.map(j => ({
+      cor:j.cor, nome:j.nome, nivel:j.nivel, tipo:"humano",
+      pecas:j.pecas.slice(), perdeVez:j.perdeVez, terminouEm:j.terminouEm
+    })),
+    vez: jogo.vez, dado: jogo.dado, colocacao: jogo.colocacao,
+    fase: (jogo.fase === "pergunta" || jogo.fase === "pensando") ? "rolar" : jogo.fase,
+    acabou: jogo.fase === "fim"
+  };
+}
+
+function aplicarEstado(d){
+  if(!d) return;
+  cfg.qtdPecas = d.qtdPecas; cfg.comer = d.comer; cfg.rigoroso = d.rigoroso;
+  cfg.qtdJogadores = d.jogadores.length;
+  cfg.jogadores = d.jogadores.map(j => ({cor:j.cor, nome:j.nome, tipo:"humano", nivel:j.nivel}));
+
+  const primeira = !jogo;
+  if(primeira) jogo = {};
+  jogo.jogadores = d.jogadores.map(j => ({
+    cor:j.cor, nome:j.nome, tipo:"humano", nivel:j.nivel,
+    pecas:j.pecas.slice(), perdeVez:j.perdeVez, terminouEm:j.terminouEm
+  }));
+  jogo.vez = d.vez; jogo.dado = d.dado; jogo.colocacao = d.colocacao;
+  jogo.fase = d.fase; jogo.movimentos = null;
+
+  if(primeira){ trocarTela("telaJogo"); construirTabuleiro(); }
+  else desenharPecas();
+
+  mostrarDado(jogo.dado);
+  atualizarPainel();
+
+  if(d.acabou) return fimDeJogo();
+  setTimeout(retomarVez, 0);
+}
+
+/* Redesenha a partir do estado recebido, sem rolar dado nenhum:
+   quem rola é só o aparelho da vez. */
+function retomarVez(){
+  if(!jogo || jogo.fase === "fim") return;
+  const j = atual();
+  if(Sala.ativa() && !souDaVez()){
+    $("#btnRolar").disabled = true;
+    desenharPecas();
+    return avisar("Aguardando " + j.nome + " no outro aparelho…");
+  }
+  iniciarVez();
+}
+
+function publicar(){ Sala.enviar(); }
 
 /* ----------------------------------------------------------------------
    8. TEMA E LIGAÇÕES
@@ -1390,6 +1471,35 @@ document.addEventListener("keydown", e => {
 ["pointerdown","keydown"].forEach(ev =>
   document.addEventListener(ev, () => Som.acordar(), {once:true})
 );
+
+Sala.montarPainel($("#painelSala"), {
+  jogoId: "trilha", lugares: 4,
+  retratar: retratar, aplicar: aplicarEstado,
+  aoMudarGente: (n) => {
+    if(Sala.souDono && !jogo){
+      cfg.qtdJogadores = Math.max(2, Math.min(4, n));
+      montarPreparo();
+      $("#btnComecar").textContent = "Começar a partida (" + n + " na sala)";
+    }
+  },
+  aoMudarLugar: (l) => {
+    $("#btnComecar").textContent = l === 0 ? "Começar a partida (você comanda)"
+                                           : "Esperando o comando do jogador 1";
+    $("#btnComecar").disabled = l !== 0;
+  },
+  aoLigar: (lugar) => {
+    cfg.jogadores.forEach(j => j.tipo = "humano");
+    montarPreparo();
+    $("#btnComecar").textContent = lugar === 0 ? "Começar a partida (você comanda)"
+                                               : "Esperando o comando do jogador 1";
+    $("#btnComecar").disabled = lugar !== 0;
+  },
+  aoDesligar: () => {
+    if(Sala.ativa()) Sala.fechar();
+    $("#btnComecar").textContent = "Começar a partida";
+    $("#btnComecar").disabled = false;
+  }
+});
 
 $("#btnComecar").addEventListener("click", comecarPartida);
 $("#btnRolar").addEventListener("click", () => { if(jogo && jogo.fase === "rolar") rolarDado(); });

@@ -15,7 +15,7 @@
    não existe tabela nenhuma, não há o que ler nem o que estragar.
    Para trocar de projeto, mude as duas linhas.
    ---------------------------------------------------------
-   sala.js v1.2.0
+   sala.js v1.3.1
    ========================================================= */
 "use strict";
 
@@ -29,6 +29,8 @@ const Sala = {
   jogoId: null,
   lugares: 2,
   meuLugar: null,
+  meuId: null,
+  lista: [],
   nomes: [],
   versao: 0,
   souDono: false,
@@ -94,7 +96,10 @@ const Sala = {
       abrir(codigo, aoReceber, aoMudarGente){
         canal = cliente.channel("arena-" + codigo, { config: { broadcast: { self:false }, presence: { key: String(Math.random()).slice(2) } } });
         canal.on("broadcast", { event: "estado" }, ({payload}) => aoReceber(payload));
-        canal.on("broadcast", { event: "pedido" }, () => aoReceber({pedido:true}));
+        canal.on("broadcast", { event: "pedido" }, ({payload}) =>
+          aoReceber({pedido:true, id: payload && payload.id}));
+        canal.on("broadcast", { event: "lugares" }, ({payload}) =>
+          aoReceber({lugares: payload && payload.lista}));
         canal.on("presence", { event: "sync" }, () => {
           const gente = canal.presenceState();
           aoMudarGente(Object.keys(gente).length);
@@ -136,6 +141,8 @@ const Sala = {
   },
 
   async abrir({codigo, jogoId, lugares, dono, ganchos}){
+    this.meuId = Math.random().toString(36).slice(2) + Date.now().toString(36);
+    this.lista = dono ? [this.meuId] : [];
     this.codigo = codigo;
     this.jogoId = jogoId;
     this.lugares = lugares || 2;
@@ -163,8 +170,8 @@ const Sala = {
       });
 
     this.ligada = true;
-    // quem entra depois pede o estado atual a quem já estava
-    if(!dono) this.transporte.enviar("pedido", {de:this.meuLugar});
+    // quem entra depois se apresenta: pede o estado e um lugar na mesa
+    if(!dono) this.transporte.enviar("pedido", {id:this.meuId});
   },
 
   fechar(){
@@ -172,8 +179,12 @@ const Sala = {
     this.ligada = false;
     this.codigo = null;
     this.meuLugar = null;
+    this.lista = [];
     this.versao = 0;
   },
+
+  /* quantos aparelhos a sala já reconhece */
+  quantosNaSala(){ return this.lista ? this.lista.length : (this.ligada ? 1 : 0); },
 
   /* =========================================================
      PUBLICAR E RECEBER
@@ -198,12 +209,30 @@ const Sala = {
   receber(msg){
     if(!msg) return;
 
-    // alguém acabou de chegar e quer saber como está a partida
+    /* Alguém chegou. Quem abriu a sala é quem distribui os lugares:
+       guarda o recém-chegado na fila, avisa a todos qual é o lugar de
+       cada um e reenvia o estado da partida. */
     if(msg.pedido){
+      if(this.souDono){
+        if(msg.id && this.lista.indexOf(msg.id) < 0) this.lista.push(msg.id);
+        this.transporte.enviar("lugares", {lista:this.lista.slice()});
+      }
       if(this.ganchos.aoPedirEstado){
         const estado = this.ganchos.aoPedirEstado();
         if(estado) this.publicar(estado);
       }
+      return;
+    }
+
+    // o dono da sala informou a ordem dos lugares
+    if(msg.lugares){
+      this.lista = msg.lugares.slice();
+      const meu = this.lista.indexOf(this.meuId);
+      if(meu >= 0 && meu !== this.meuLugar){
+        this.meuLugar = meu;
+        if(this.ganchos.aoMudarLugar) this.ganchos.aoMudarLugar(meu);
+      }
+      if(this.ganchos.aoMudarGente) this.ganchos.aoMudarGente(this.lista.length);
       return;
     }
 
@@ -262,6 +291,24 @@ const Sala = {
   /* true quando este aparelho comanda os botões de avançar a partida */
   comando(){ return !this.ligada || this.meuLugar === 0; },
 
+  /* Botões de escolha. Usa o do comum.js quando existe, mas sabe se virar
+     sozinho: a Trilha é anterior aos arquivos compartilhados e não o carrega. */
+  escolhas(container, valores, atual, aoEscolher){
+    if(typeof UI !== "undefined" && UI && UI.escolhas)
+      return UI.escolhas(container, valores, atual, aoEscolher);
+    container.innerHTML = "";
+    valores.forEach(v => {
+      const valor  = (typeof v === "object") ? v.valor  : v;
+      const rotulo = (typeof v === "object") ? v.rotulo : v;
+      const b = document.createElement("button");
+      b.className = "escolha";
+      b.textContent = rotulo;
+      b.setAttribute("aria-pressed", String(valor === atual));
+      b.addEventListener("click", () => aoEscolher(valor));
+      container.appendChild(b);
+    });
+  },
+
   /* =========================================================
      O PAINEL DE SALA — igual em todos os jogos
      ========================================================= */
@@ -271,7 +318,8 @@ const Sala = {
     op.ganchos = {
       aoReceberEstado: (e) => this.receberEstado(e),
       aoPedirEstado:   () => op.retratar(),
-      aoMudarGente:    (n) => { if(op.aoMudarGente) op.aoMudarGente(n); }
+      aoMudarGente:    (n) => { if(op.aoMudarGente) op.aoMudarGente(n); },
+      aoMudarLugar:    (l) => { if(op.aoMudarLugar) op.aoMudarLugar(l); }
     };
 
     const bloco = document.createElement("div");
@@ -286,7 +334,7 @@ const Sala = {
     let modo = "sozinhos";
 
     const desenhar = () => {
-      UI.escolhas(bloco.querySelector("#salaModo"),
+      this.escolhas(bloco.querySelector("#salaModo"),
         [{valor:"sozinhos", rotulo:"Neste aparelho"},
          {valor:"criar",    rotulo:"Criar sala"},
          {valor:"entrar",   rotulo:"Entrar numa sala"}],
