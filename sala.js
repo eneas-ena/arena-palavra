@@ -10,16 +10,17 @@
    configurar, e nada fica gravado em lugar nenhum.
 
    ---------------------------------------------------------
-   PARA FUNCIONAR, PREENCHA AS DUAS LINHAS ABAIXO
-   com os dados do seu projeto Supabase (Settings > API).
-   A chave "anon" pode ficar à vista: sem tabela, não há o que ler.
+   O projeto Supabase já está preenchido abaixo. A chave é a
+   publicável, feita para ficar à vista no navegador — e como aqui
+   não existe tabela nenhuma, não há o que ler nem o que estragar.
+   Para trocar de projeto, mude as duas linhas.
    ---------------------------------------------------------
-   sala.js v1.0.0
+   sala.js v1.1.0
    ========================================================= */
 "use strict";
 
-const SUPABASE_URL   = "https://hyfayoqhaqbsnzyqpeqs.supabase.co";   // ex.: https://xxxxxxxx.supabase.co
-const SUPABASE_ANON  = "sb_publishable_N0fGYr9UWwWabfRrTWWjyQ_28QZBQ3K";   // a chave pública "anon"
+const SUPABASE_URL   = "https://hyfayoqhaqbsnzyqpeqs.supabase.co";
+const SUPABASE_ANON  = "sb_publishable_N0fGYr9UWwWabfRrTWWjyQ_28QZBQ3K";
 
 const Sala = {
   /* ---------- estado interno ---------- */
