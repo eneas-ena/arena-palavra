@@ -178,7 +178,7 @@
    v1.0.0
    ========================================================= */
 
-const VERSAO = "1.3.0";
+const VERSAO = "1.3.1";
 
 /* Mesa maior exige pergunta mais curta, senão o texto não cabe na carta. */
 const MESAS = {
@@ -804,7 +804,10 @@ function receberDoOutro(d){
   if(d.pedidoVirar !== undefined){
     if(!souOJuiz()) return;
     if(d.de !== jogo.vez) return;          // só quem é da vez pode pedir
-    return abrirCarta(d.pedidoVirar);
+    /* Fora da trava de eco de propósito. Este trecho roda dentro da
+       aplicação de uma mensagem recebida, e ali nada é publicado — a
+       carta virava na tela do juiz e a resposta nunca saía. */
+    return setTimeout(() => abrirCarta(d.pedidoVirar), 0);
   }
   aplicarEstado(d);
 }
