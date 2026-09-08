@@ -163,6 +163,8 @@
     </label>
   </div>
 
+  <div id="painelSala"></div>
+
   <button class="principal" id="btnComecar">Começar</button>
 </section>
 
@@ -215,6 +217,7 @@
 
 <script src="perguntas.js"></script>
 <script src="comum.js"></script>
+<script src="sala.js"></script>
 <script>
 "use strict";
 
@@ -225,7 +228,7 @@
    v1.0.0
    ========================================================= */
 
-const VERSAO = "2.1.1";
+const VERSAO = "2.2.1";
 const CORES_JOGADOR = ["#D4565F", "#C9A227", "#2A5B9C", "#2E6B4F"];
 const PIPS = {0:[],1:[4],2:[0,8],3:[0,4,8],4:[0,2,6,8],5:[0,2,4,6,8],6:[0,2,3,5,6,8]};
 
@@ -442,9 +445,24 @@ function novaMao(){
     });
   });
   jogo.vez = quem;
+  jogo.dormeQtd = jogo.dorme.length;
+
+  if(online()){
+    // só a mão do outro vai para o outro; a minha nunca sai daqui
+    recado({tipo:"maos", mao: cfg.jogadores[1].mao, qtdDele: cfg.jogadores[0].mao.length,
+            dorme: jogo.dorme.length, comeca: quem, rodada: jogo.mao,
+            alvo: cfg.alvo, batida: cfg.batida, pecas: cfg.pecas, comprar: cfg.comprar,
+            pontos: cfg.jogadores.map(j => j.pontos),
+            nomes: cfg.jogadores.map(j => j.nome)});
+    /* Depois de mandar, o dono esquece a mão do outro. Ele precisou
+       conhecê-la por um instante para distribuir; guardá-la seria
+       deixar aberta a porta que este jogo inteiro serve para fechar. */
+    cfg.jogadores[1].mao = Array(cfg.jogadores[1].mao.length).fill(null);
+  }
 
   jogo.ultimoJogador = null;
   $("#desfecho").innerHTML = "";
+  jogo.fase = "jogar";
   redesenhar();
   avisar((jogo.impugnadas
       ? (jogo.impugnadas === 1 ? "Uma mão foi impugnada por cinco carroças. " : jogo.impugnadas + " mãos foram impugnadas. ")
@@ -606,13 +624,14 @@ function desenharMao(){
   if(jogo.escolhida === null) fecharEscolhaDePonta();
   const cx = $("#minhaMao");
   cx.innerHTML = "";
-  const j = atual();
-  const humano = j.tipo === "humano" && jogo.fase === "jogar";
+  const j = online() ? cfg.jogadores[meuIndice()] : atual();
+  const humano = (online() ? souDaVez() : j.tipo === "humano") && jogo.fase === "jogar";
   if(!humano){
     const aviso = document.createElement("p");
     aviso.className = "legenda";
     aviso.style.margin = "auto";
-    aviso.textContent = j.tipo === "maquina" ? j.nome + " está jogando…" : "";
+    aviso.textContent = online() ? (atual().nome + " está jogando…")
+                                 : (j.tipo === "maquina" ? j.nome + " está jogando…" : "");
     cx.appendChild(aviso);
     $("#botoes").style.display = "none";
     return;
@@ -637,10 +656,11 @@ function desenharMao(){
   });
 
   $("#botoes").style.display = "flex";
+  const noDorme = online() ? (jogo.dormeQtd || 0) : jogo.dorme.length;
   $("#btnComprar").style.display = cfg.comprar ? "" : "none";
-  $("#btnComprar").disabled = podem.length > 0 || jogo.dorme.length === 0;
+  $("#btnComprar").disabled = podem.length > 0 || noDorme === 0;
   // só se passa quando não há jogada e também não há de onde comprar
-  $("#btnPassar").disabled = podem.length > 0 || (cfg.comprar && jogo.dorme.length > 0);
+  $("#btnPassar").disabled = podem.length > 0 || (cfg.comprar && noDorme > 0);
 }
 
 function avisar(t){ $("#aviso").textContent = t || ""; }
@@ -648,10 +668,19 @@ function avisar(t){ $("#aviso").textContent = t || ""; }
 /* ---------- vez ---------- */
 
 function seguirVez(){
-  if(jogo.fase === "fim") return;
+  if(jogo.fase === "fim" || jogo.fase === "fim-mao") return;
   jogo.fase = "jogar";
   jogo.escolhida = null;
   const j = atual();
+
+  if(online()){
+    redesenhar();
+    if(!souDaVez()){
+      $("#botoes").style.display = "none";
+      return avisar("Aguardando " + j.nome + " no outro aparelho…");
+    }
+    return mostrarVez();
+  }
 
   if(j.tipo === "maquina"){
     redesenhar();
@@ -737,6 +766,12 @@ function encaixar(indice, lado){
           Som.erro();
           avisar("A batida falhou. A peça continua com você.");
           jogo.fase = "jogar";
+          if(online()){
+            // a vez muda aqui: sem avisar, os dois ficam se esperando
+            recado({tipo:"vezPassa"});
+            jogo.vez = 1 - meuIndice();
+            return depois(seguirVez);
+          }
           return setTimeout(passarAdiante, 900);
         }
         assentar(indice, lado);
@@ -762,19 +797,9 @@ function encaixar(indice, lado){
   assentar(indice, lado);
 }
 
-function assentar(indice, lado){
-  const j = atual();
-  if(!j.mao[indice]) return;
-
-  // o tipo da batida depende das pontas ANTES desta jogada
-  const tipo = (j.mao.length === 1 && jogo.mesa.length)
-    ? tipoDaBatida(j.mao[indice], jogo.pontas) : null;
-
-  const pc = j.mao.splice(indice, 1)[0];
-  jogo.escolhida = null;
-  jogo.passesSeguidos = 0;
-  Som.marcar();
-
+/* Põe uma peça na mesa. Serve tanto para a minha jogada quanto para a
+   que chega do outro aparelho — por isso recebe a peça, e não o índice. */
+function assentarPeca(pc, lado, dono){
   if(jogo.mesa.length === 0){
     jogo.mesa.push(pc.slice());
     jogo.pontas = [pc[0], pc[1]];
@@ -789,6 +814,36 @@ function assentar(indice, lado){
     jogo.mesa.push(posta);
     jogo.pontas[1] = posta[1];
   }
+  Som.marcar();
+}
+
+function assentar(indice, lado){
+  const j = atual();
+  if(!j.mao[indice]) return;
+
+  // o tipo da batida depende das pontas ANTES desta jogada
+  const tipo = (j.mao.length === 1 && jogo.mesa.length)
+    ? tipoDaBatida(j.mao[indice], jogo.pontas) : null;
+
+  const pc = j.mao.splice(indice, 1)[0];
+  jogo.escolhida = null;
+  jogo.passesSeguidos = 0;
+  assentarPeca(pc, lado, jogo.vez);
+
+  if(online()){
+    recado({tipo:"joga", pc, lado, restam: j.mao.length});
+    if(j.mao.length === 0){
+      const pontos = BATIDAS[tipo || "simples"].pontos;
+      recado({tipo:"bateu", batida: tipo || "simples", pontos});
+      redesenhar();
+      return setTimeout(() => fecharMaoOnline(meuIndice(), tipo || "simples", pontos), 700);
+    }
+    jogo.fase = "jogar";
+    jogo.vez = 1 - meuIndice();
+    redesenhar();
+    avisar("Você jogou " + pc[0] + "-" + pc[1] + ".");
+    return depois(seguirVez);
+  }
 
   jogo.fase = "jogar";
   redesenhar();
@@ -801,7 +856,22 @@ function assentar(indice, lado){
 }
 
 function comprar(){
-  if(jogo.fase !== "jogar" || !cfg.comprar || jogo.dorme.length === 0) return;
+  if(jogo.fase !== "jogar" || !cfg.comprar) return;
+  if(online()){
+    if(!souDaVez()) return;
+    if((jogo.dormeQtd || 0) === 0) return;
+    if(souODono()){
+      const pc = jogo.dorme.pop();
+      jogo.dormeQtd = jogo.dorme.length;
+      cfg.jogadores[meuIndice()].mao.push(pc);
+      recado({tipo:"dorme", n: jogo.dorme.length});
+      Som.toque(); redesenhar();
+      return avisar("Você comprou " + pc[0] + "-" + pc[1] + ". Restam " + jogo.dormeQtd + " no dorme.");
+    }
+    recado({tipo:"compra"});
+    return avisar("Pedindo uma peça do dorme…");
+  }
+  if(jogo.dorme.length === 0) return;
   const j = atual();
   j.mao.push(jogo.dorme.pop());
   Som.toque();
@@ -811,9 +881,24 @@ function comprar(){
 
 function passar(){
   if(jogo.fase !== "jogar") return;
+  if(online() && !souDaVez()) return;
   jogo.fase = "movendo";
   jogo.passesSeguidos++;
   Som.pausa();
+
+  if(online()){
+    avisar("Você passou a vez.");
+    recado({tipo:"passa"});
+    if(jogo.passesSeguidos >= 2){
+      const soma = cfg.jogadores[meuIndice()].mao.reduce((s, p) => s + valor(p), 0);
+      recado({tipo:"soma", valor:soma, de:meuIndice()});
+      if(souODono()) guardarSoma(meuIndice(), soma);
+      return;
+    }
+    jogo.vez = 1 - meuIndice();
+    return depois(seguirVez);
+  }
+
   avisar(atual().nome + " passou a vez.");
   if(jogo.passesSeguidos >= cfg.qtd) return setTimeout(() => fimDaMao(null, null), 800);
   setTimeout(passarAdiante, 700);
@@ -953,10 +1038,199 @@ function fimDaPartida(){
 }
 
 /* ---------------------------------------------------------
+   SALA — mão escondida e um dorme compartilhado
+
+   Cada aparelho guarda a própria mão e nunca a envia. Quem abre a
+   sala distribui as pedras, manda ao outro apenas a mão dele, e fica
+   com o dorme: quando o outro precisa comprar, pede e recebe uma peça.
+
+   Recados: maos, joga, compra, peca, passa, bateu, soma, trancou.
+   Toda resposta do dono sai fora da trava de eco, senão morre ali.
+   --------------------------------------------------------- */
+
+function online(){ return Sala.ativa(); }
+function souODono(){ return Sala.meuLugar === 0; }
+function meuIndice(){ return online() ? Sala.meuLugar : jogo.vez; }
+function souDaVez(){ return !online() || jogo.vez === meuIndice(); }
+function recado(m){ if(online()) Sala.publicar(m); }
+function depois(f){ setTimeout(f, 0); }
+
+function receberRecado(m){
+  if(!m || !m.tipo) return;
+
+  if(m.tipo === "maos"){
+    cfg.alvo = m.alvo; cfg.batida = m.batida;
+    cfg.pecas = m.pecas; cfg.comprar = m.comprar; cfg.qtd = 2;
+    montarPreparo();
+    cfg.jogadores.forEach((j, i) => { j.tipo = "humano"; j.pontos = m.pontos[i]; });
+    cfg.jogadores[0].nome = m.nomes[0]; cfg.jogadores[1].nome = m.nomes[1];
+    jogo = jogo || {mao:1};
+    jogo.mao = m.rodada;
+    cfg.jogadores[1].mao = m.mao;                  // a minha, que sou o segundo
+    cfg.jogadores[0].mao = Array(m.qtdDele).fill(null);
+    jogo.dorme = [];                                // o dorme fica com o dono
+    jogo.dormeQtd = m.dorme;
+    jogo.mesa = []; jogo.pontas = [null, null];
+    jogo.vez = m.comeca; jogo.fase = "jogar";
+    jogo.escolhida = null; jogo.passesSeguidos = 0;
+    UI.trocarTela("telaJogo");
+    $("#desfecho").innerHTML = "";
+    redesenhar();
+    avisar(cfg.jogadores[m.comeca].nome + " começa, com a peça mais alta.");
+    return depois(seguirVez);
+  }
+
+  if(!jogo) return;
+
+  if(m.tipo === "joga"){
+    const outro = 1 - meuIndice();
+    assentarPeca(m.pc, m.lado, outro);
+    cfg.jogadores[outro].mao = Array(m.restam).fill(null);
+    jogo.passesSeguidos = 0;
+    redesenhar();
+    avisar(cfg.jogadores[outro].nome + " jogou " + m.pc[0] + "-" + m.pc[1] + ".");
+    if(m.restam === 0) return;                      // o recado "bateu" vem em seguida
+    jogo.vez = meuIndice(); jogo.fase = "jogar";
+    return depois(seguirVez);
+  }
+
+  if(m.tipo === "compra"){                          // só o dono responde
+    if(!souODono()) return;
+    return depois(() => {
+      const pc = jogo.dorme.pop();
+      jogo.dormeQtd = jogo.dorme.length;
+      const outro = 1 - meuIndice();
+      cfg.jogadores[outro].mao.push(null);
+      recado({tipo:"peca", pc, dorme: jogo.dorme.length});
+      redesenhar();
+      avisar(cfg.jogadores[outro].nome + " comprou uma peça.");
+    });
+  }
+
+  if(m.tipo === "peca"){
+    cfg.jogadores[meuIndice()].mao.push(m.pc);
+    jogo.dormeQtd = m.dorme;
+    Som.toque();
+    redesenhar();
+    avisar("Você comprou " + m.pc[0] + "-" + m.pc[1] + ". Restam " + m.dorme + " no dorme.");
+    return;
+  }
+
+  if(m.tipo === "dorme"){ jogo.dormeQtd = m.n; redesenhar(); return; }
+
+  if(m.tipo === "vezPassa"){
+    const outro = 1 - meuIndice();
+    avisar(cfg.jogadores[outro].nome + " ia bater mas errou a pergunta.");
+    jogo.vez = meuIndice(); jogo.fase = "jogar";
+    return depois(seguirVez);
+  }
+
+  if(m.tipo === "passa"){
+    jogo.passesSeguidos++;
+    const outro = 1 - meuIndice();
+    avisar(cfg.jogadores[outro].nome + " passou a vez.");
+    if(jogo.passesSeguidos >= 2){
+      const soma = cfg.jogadores[meuIndice()].mao.reduce((s, p) => s + valor(p), 0);
+      recado({tipo:"soma", valor:soma, de:meuIndice()});
+      if(souODono()) guardarSoma(meuIndice(), soma);
+      return;
+    }
+    jogo.vez = meuIndice(); jogo.fase = "jogar";
+    return depois(seguirVez);
+  }
+
+  if(m.tipo === "soma"){
+    if(!souODono()) return;
+    return guardarSoma(m.de, m.valor);
+  }
+
+  if(m.tipo === "trancou"){
+    return fecharMaoOnline(m.vencedor, "trancou", m.pontos);
+  }
+
+  if(m.tipo === "bateu"){
+    const outro = 1 - meuIndice();
+    return fecharMaoOnline(outro, m.batida, m.pontos);
+  }
+
+  if(m.tipo === "novaMao"){
+    return receberRecado(Object.assign({}, m.maos, {tipo:"maos"}));
+  }
+}
+
+let somasTrancou = {};
+function guardarSoma(quem, valorSoma){
+  somasTrancou[quem] = valorSoma;
+  if(Object.keys(somasTrancou).length < 2) return;
+  const a = somasTrancou[0], b = somasTrancou[1];
+  const vencedor = a <= b ? 0 : 1;
+  somasTrancou = {};
+  depois(() => {
+    recado({tipo:"trancou", vencedor, pontos: BATIDAS.trancou.pontos});
+    fecharMaoOnline(vencedor, "trancou", BATIDAS.trancou.pontos);
+  });
+}
+
+function fecharMaoOnline(vencedor, tipo, pontos){
+  jogo.fase = "fim-mao";
+  cfg.jogadores[vencedor].pontos += pontos;
+  const batida = BATIDAS[tipo] || BATIDAS.simples;
+  Som.chegou();
+  redesenhar();
+
+  const cx = $("#desfecho");
+  cx.innerHTML = "";
+  const frase = document.createElement("p");
+  frase.className = "frase venceu";
+  frase.textContent = tipo === "trancou"
+    ? "A mesa trancou. " + cfg.jogadores[vencedor].nome + " tinha menos pontos na mão."
+    : cfg.jogadores[vencedor].nome + " bateu — " + batida.nome.toLowerCase() + "!";
+  const conta = document.createElement("p");
+  conta.className = "conta";
+  conta.textContent = pontos + (pontos === 1 ? " ponto" : " pontos") +
+    " · total " + cfg.jogadores[vencedor].pontos + " de " + cfg.alvo;
+  cx.append(frase, conta);
+
+  if(cfg.jogadores[vencedor].pontos >= cfg.alvo) return setTimeout(fimDaPartida, 1500);
+
+  const b = document.createElement("button");
+  b.className = "principal";
+  const comando = souODono();
+  b.textContent = comando ? "Próxima mão" : "Aguardando a próxima mão…";
+  b.disabled = !comando;
+  if(comando) b.addEventListener("click", () => { jogo.mao++; novaMao(); });
+  cx.appendChild(b);
+  if(comando) b.focus();
+}
+
+/* ---------------------------------------------------------
    LIGAÇÕES
    --------------------------------------------------------- */
 
 UI.iniciar({ titulo:"Dominó", versao:VERSAO, regras:REGRAS, voltar:"index.html" });
+
+Sala.montarPainel($("#painelSala"), {
+  jogoId: "domino", lugares: 2,
+  retratar: () => null,               // aqui não se publica estado, só recados
+  aplicar: (m) => receberRecado(m),
+  aoMudarGente: (n) => { if(jogo && jogo.fase !== "fim" && n < 2) avisar("O outro aparelho saiu da sala."); },
+  aoLigar: (lugar) => {
+    cfg.qtd = 2;
+    montarPreparo();
+    cfg.jogadores.forEach((j, i) => {
+      j.tipo = "humano";
+      if(/Máquina/.test(j.nome)) j.nome = "Jogador " + (i + 1);
+    });
+    montarPreparo();
+    $("#btnComecar").textContent = lugar === 0 ? "Começar (você distribui)" : "Esperando o outro aparelho começar";
+    $("#btnComecar").disabled = lugar !== 0;
+  },
+  aoDesligar: () => {
+    if(Sala.ativa()) Sala.fechar();
+    $("#btnComecar").textContent = "Começar";
+    $("#btnComecar").disabled = false;
+  }
+});
 
 $("#btnComecar").addEventListener("click", comecar);
 let reajuste = null;
