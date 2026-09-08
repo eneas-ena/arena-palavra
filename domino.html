@@ -228,7 +228,7 @@
    v1.0.0
    ========================================================= */
 
-const VERSAO = "2.2.1";
+const VERSAO = "2.3.0";
 const CORES_JOGADOR = ["#D4565F", "#C9A227", "#2A5B9C", "#2E6B4F"];
 const PIPS = {0:[],1:[4],2:[0,8],3:[0,4,8],4:[0,2,6,8],5:[0,2,4,6,8],6:[0,2,3,5,6,8]};
 
@@ -625,19 +625,25 @@ function desenharMao(){
   const cx = $("#minhaMao");
   cx.innerHTML = "";
   const j = online() ? cfg.jogadores[meuIndice()] : atual();
-  const humano = (online() ? souDaVez() : j.tipo === "humano") && jogo.fase === "jogar";
-  if(!humano){
+
+  /* Numa sala, a mão é sua e fica sempre à vista — só deixa de aceitar
+     toque quando não é a sua vez. Esconder as peças faz sentido apenas
+     no revezamento em um aparelho só, onde a tela é de todos. */
+  const minhaSempre = online();
+  const podeTocar = minhaSempre ? souDaVez() && jogo.fase === "jogar"
+                                : j.tipo === "humano" && jogo.fase === "jogar";
+
+  if(!minhaSempre && !podeTocar){
     const aviso = document.createElement("p");
     aviso.className = "legenda";
     aviso.style.margin = "auto";
-    aviso.textContent = online() ? (atual().nome + " está jogando…")
-                                 : (j.tipo === "maquina" ? j.nome + " está jogando…" : "");
+    aviso.textContent = j.tipo === "maquina" ? j.nome + " está jogando…" : "";
     cx.appendChild(aviso);
     $("#botoes").style.display = "none";
     return;
   }
 
-  const podem = jogaveis(j.mao);
+  const podem = podeTocar ? jogaveis(j.mao) : [];
   j.mao.forEach((pc, i) => {
     const d = desenharPeca(pc, false);
     const jog = podem.find(x => x.i === i);
@@ -655,7 +661,7 @@ function desenharMao(){
     cx.appendChild(d);
   });
 
-  $("#botoes").style.display = "flex";
+  $("#botoes").style.display = podeTocar ? "flex" : "none";
   const noDorme = online() ? (jogo.dormeQtd || 0) : jogo.dorme.length;
   $("#btnComprar").style.display = cfg.comprar ? "" : "none";
   $("#btnComprar").disabled = podem.length > 0 || noDorme === 0;
@@ -1219,7 +1225,9 @@ Sala.montarPainel($("#painelSala"), {
     montarPreparo();
     cfg.jogadores.forEach((j, i) => {
       j.tipo = "humano";
-      if(/Máquina/.test(j.nome)) j.nome = "Jogador " + (i + 1);
+      // "Você" confunde numa sala: na tela do outro apareceria
+      // "aguardando Você", falando de outra pessoa
+      if(/Máquina|Você/.test(j.nome)) j.nome = "Jogador " + (i + 1);
     });
     montarPreparo();
     $("#btnComecar").textContent = lugar === 0 ? "Começar (você distribui)" : "Esperando o outro aparelho começar";
