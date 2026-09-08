@@ -228,7 +228,7 @@
    v1.0.0
    ========================================================= */
 
-const VERSAO = "2.3.0";
+const VERSAO = "2.4.0";
 const CORES_JOGADOR = ["#D4565F", "#C9A227", "#2A5B9C", "#2E6B4F"];
 const PIPS = {0:[],1:[4],2:[0,8],3:[0,4,8],4:[0,2,6,8],5:[0,2,4,6,8],6:[0,2,3,5,6,8]};
 
@@ -667,6 +667,11 @@ function desenharMao(){
   $("#btnComprar").disabled = podem.length > 0 || noDorme === 0;
   // só se passa quando não há jogada e também não há de onde comprar
   $("#btnPassar").disabled = podem.length > 0 || (cfg.comprar && noDorme > 0);
+
+  // sem jogada possível, destaca o botão que é a única saída
+  const semJogada = podeTocar && podem.length === 0;
+  $("#btnComprar").classList.toggle("precisa", semJogada && !$("#btnComprar").disabled);
+  $("#btnPassar").classList.toggle("precisa", semJogada && !$("#btnPassar").disabled);
 }
 
 function avisar(t){ $("#aviso").textContent = t || ""; }
@@ -715,11 +720,12 @@ function mostrarVez(){
   const j = atual();
   redesenhar();
   const podem = jogaveis(j.mao);
+  const noDorme = online() ? (jogo.dormeQtd || 0) : jogo.dorme.length;
   avisar(podem.length
     ? j.nome + ", escolha uma peça."
-    : (cfg.comprar && jogo.dorme.length
-        ? "Nenhuma peça serve. Compre do dorme."
-        : "Nenhuma peça serve. Passe a vez."));
+    : (cfg.comprar && noDorme
+        ? "Nenhuma peça sua serve nas pontas. Toque em “Comprar do dorme”."
+        : "Nenhuma peça sua serve e não há de onde comprar. Toque em “Passar a vez”."));
 }
 
 function escolherPeca(jog){
