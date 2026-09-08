@@ -9,7 +9,7 @@
 
    Para acrescentar um personagem, copie um bloco e troque o conteúdo.
    A primeira pista deve ser a mais obscura; a quinta, quase entregar.
-   personagens.js v1.0.0
+   personagens.js v2.0.0
    ========================================================= */
 "use strict";
 
@@ -27,14 +27,14 @@ const GRUPOS = {
 /* Nomes que entram na lista de suspeitos de cada grupo.
    Nem todos têm ficha: servem para dar o que descartar. */
 const ELENCO = {
-  patriarcas: ["Adão","Caim","Abel","Sete","Enoque","Matusalém","Noé","Sem","Terá","Abraão","Ló","Ismael","Isaque","Esaú","Jacó","Labão","Judá","José","Benjamim","Rúben","Levi"],
-  exodo:      ["Moisés","Arão","Jetro","Coré","Josué","Calebe","Balaão","Faraó","Nadabe","Hur","Bezalel","Eleazar","Fineias","Anrão","Datã"],
-  juizes:     ["Otniel","Eúde","Sangar","Baraque","Gideão","Abimeleque","Jefté","Sansão","Eli","Samuel","Boaz","Manoá","Jônatas","Abner","Isbosete"],
-  reis:       ["Saul","Davi","Salomão","Roboão","Jeroboão","Acabe","Jeú","Onri","Josafá","Uzias","Ezequias","Manassés","Josias","Zedequias","Joás","Nabucodonosor","Belsazar","Dario","Ciro","Assuero"],
-  profetas:   ["Natã","Elias","Eliseu","Isaías","Jeremias","Ezequiel","Daniel","Oseias","Joel","Amós","Obadias","Jonas","Miqueias","Naum","Habacuque","Sofonias","Ageu","Zacarias","Malaquias"],
-  mulheres:   ["Eva","Sara","Agar","Rebeca","Raquel","Lia","Miriã","Raabe","Débora","Jael","Dalila","Noemi","Rute","Ana","Abigail","Betsabé","Jezabel","Ester","Maria","Marta","Isabel","Lídia","Priscila","Dorcas"],
-  evangelhos: ["Pedro","André","Tiago","João","Filipe","Bartolomeu","Tomé","Mateus","Simão","Judas Iscariote","João Batista","Nicodemos","Zaqueu","Lázaro","Bartimeu","Pilatos","Herodes","Caifás","Barrabás","Simão Cireneu","José de Arimateia"],
-  atos:       ["Paulo","Barnabé","Silas","Timóteo","Tito","Estêvão","Filipe","Cornélio","Ananias","Apolo","Lucas","Marcos","Onésimo","Filemom","Gamaliel","Áquila","Matias","Eutico","Lídia","Dorcas","Sérgio Paulo"]
+  patriarcas: ["Adão","Caim","Abel","Sete","Enoque","Matusalém","Noé","Sem","Terá","Abraão","Ló","Ismael","Isaque","Esaú","Jacó","Labão","Judá","José","Benjamim","Rúben","Levi","Melquisedeque","Tamar","Simeão","Efraim","Diná"],
+  exodo:      ["Moisés","Arão","Jetro","Coré","Josué","Calebe","Balaão","Faraó","Nadabe","Hur","Bezalel","Eleazar","Fineias","Anrão","Datã","Miriã","Abiú","Zípora","Abirão","Ítamar"],
+  juizes:     ["Otniel","Eúde","Sangar","Baraque","Gideão","Abimeleque","Jefté","Sansão","Eli","Samuel","Boaz","Manoá","Jônatas","Abner","Isbosete","Débora","Golias","Sísera","Mefibosete","Jael","Jessé","Doegue","Aquis"],
+  reis:       ["Saul","Davi","Salomão","Roboão","Jeroboão","Acabe","Jeú","Onri","Josafá","Uzias","Ezequias","Manassés","Josias","Zedequias","Joás","Nabucodonosor","Belsazar","Dario","Ciro","Assuero","Absalão","Joabe","Adonias","Atalia","Joiada"],
+  profetas:   ["Natã","Elias","Eliseu","Isaías","Jeremias","Ezequiel","Daniel","Oseias","Joel","Amós","Obadias","Jonas","Miqueias","Naum","Habacuque","Sofonias","Ageu","Zacarias","Malaquias","Miquéias","Geazi","Gade"],
+  mulheres:   ["Eva","Sara","Agar","Rebeca","Raquel","Lia","Miriã","Raabe","Débora","Jael","Dalila","Noemi","Rute","Ana","Abigail","Betsabé","Jezabel","Ester","Maria","Marta","Isabel","Lídia","Priscila","Dorcas","Maria Madalena","Mical","Herodias","Safira","Betsabá","Salomé"],
+  evangelhos: ["Pedro","André","Tiago","João","Filipe","Bartolomeu","Tomé","Mateus","Simão","Judas Iscariote","João Batista","Nicodemos","Zaqueu","Lázaro","Bartimeu","Pilatos","Herodes","Caifás","Barrabás","Simão Cireneu","José de Arimateia","Natanael","Simão de Cirene","Anás","Jairo","Malco","Cleopas"],
+  atos:       ["Paulo","Barnabé","Silas","Timóteo","Tito","Estêvão","Filipe","Cornélio","Ananias","Apolo","Lucas","Marcos","Onésimo","Filemom","Gamaliel","Áquila","Matias","Eutico","Lídia","Dorcas","Sérgio Paulo","Simão","Êutico","Agripa","Festo","Safira","Demas","Tíquico"]
 };
 
 const PERSONAGENS = [
@@ -446,7 +446,507 @@ const PERSONAGENS = [
   "Reguei aquilo que outro havia plantado.",
   "Em Corinto havia gente que se dizia do meu partido, e Paulo repreendeu essa divisão."
 ]}
+,
+/* ======================= ACRÉSCIMO ======================= */
 
+/* ---------- GÊNESIS ---------- */
+{n:"Adão", g:"patriarcas", d:1, r:"Gênesis 2—4", p:[
+  "Fui formado do pó da terra, e Deus soprou em mim o fôlego de vida.",
+  "Dei nome a todos os animais, mas entre eles não achei quem me correspondesse.",
+  "Deus me pôs num jardim para cuidar dele, com uma única proibição.",
+  "Quando Deus me chamou, eu me escondi e pus a culpa na mulher que ele me deu.",
+  "Fui o primeiro homem, e por mim a morte entrou no mundo."
+]},
+{n:"Caim", g:"patriarcas", d:1, r:"Gênesis 4", p:[
+  "Trabalhei a terra, e da terra tirei o que ofereci a Deus.",
+  "Deus me avisou que o pecado estava à porta, mas eu não dominei sobre ele.",
+  "Perguntei a Deus se eu era o guardador do meu irmão.",
+  "Recebi um sinal para que ninguém me matasse, e fui viver errante na terra de Node.",
+  "Matei meu irmão Abel porque a oferta dele foi aceita e a minha não."
+]},
+{n:"Esaú", g:"patriarcas", d:1, r:"Gênesis 25—33", p:[
+  "Nasci primeiro, mas meu irmão veio agarrado ao meu calcanhar.",
+  "Era homem do campo, caçador, e meu pai gostava da caça que eu trazia.",
+  "Voltei faminto e troquei o que era meu por direito de nascença.",
+  "Chorei alto quando descobri que a bênção do meu pai tinha ido para outro.",
+  "Reencontrei meu irmão Jacó depois de anos e o abracei em vez de me vingar."
+]},
+{n:"Judá", g:"patriarcas", d:2, r:"Gênesis 37—44", p:[
+  "Sou o quarto filho, e meu nome quer dizer louvor.",
+  "Propus aos meus irmãos que vendêssemos, em vez de matar.",
+  "Fui enganado por Tamar, minha nora, e reconheci que ela fora mais justa do que eu.",
+  "Ofereci-me como escravo no lugar do meu irmão mais novo para poupar meu pai.",
+  "Meu pai me chamou de leãozinho, e disse que o cetro não se apartaria de mim."
+]},
+{n:"Labão", g:"patriarcas", d:2, r:"Gênesis 29—31", p:[
+  "Corri ao encontro do servo que apareceu no poço com camelos e presentes.",
+  "Recebi em casa um sobrinho que fugia do irmão.",
+  "Troquei o salário do meu genro dez vezes.",
+  "Persegui minha filha por causa dos ídolos que sumiram da minha casa.",
+  "Dei a Jacó a filha errada na noite do casamento, e ele teve de servir mais sete anos por Raquel."
+]},
+{n:"Melquisedeque", g:"patriarcas", d:3, r:"Gênesis 14; Hebreus 7", p:[
+  "Apareço de repente na história, sem pai, sem mãe, sem genealogia registrada.",
+  "Era rei de uma cidade cujo nome significa paz.",
+  "Saí ao encontro de um homem que voltava de vencer quatro reis.",
+  "Trouxe pão e vinho e abençoei aquele homem, e ele me deu o dízimo de tudo.",
+  "A carta aos Hebreus diz que Cristo é sacerdote para sempre segundo a minha ordem."
+]},
+{n:"Rúben", g:"patriarcas", d:3, r:"Gênesis 35; 37; 42", p:[
+  "Sou o primogênito, mas perdi a preeminência por causa do leito do meu pai.",
+  "Achei mandrágoras no campo e as levei para a minha mãe.",
+  "Propus jogá-lo no poço sem derramar sangue, planejando tirá-lo de lá depois.",
+  "Voltei ao poço e o encontrei vazio; rasguei minhas roupas de desespero.",
+  "Ofereci meus dois filhos como garantia para que Benjamim descesse ao Egito."
+]},
+{n:"Benjamim", g:"patriarcas", d:3, r:"Gênesis 35; 42—45", p:[
+  "Minha mãe morreu ao me dar à luz e me chamou de filho da minha dor.",
+  "Meu pai trocou esse nome pelo que significa filho da mão direita.",
+  "Fui o único que ficou em casa quando meus irmãos desceram para comprar mantimento.",
+  "Na mesa do Egito, minha porção era cinco vezes maior que a dos meus irmãos.",
+  "A taça de prata do governador foi achada no meu saco de trigo."
+]},
+
+/* ---------- ÊXODO E DESERTO ---------- */
+{n:"Faraó", g:"exodo", d:1, r:"Êxodo 5—14", p:[
+  "Mandei aumentar o trabalho e mandei que buscassem a própria palha.",
+  "Perguntei quem era o Senhor para que eu lhe obedecesse.",
+  "Meus magos imitaram os primeiros sinais, mas depois reconheceram o dedo de Deus.",
+  "Endureci o coração dez vezes, até a noite em que meu primogênito morreu.",
+  "Persegui os hebreus com meus carros e o mar se fechou sobre o meu exército."
+]},
+{n:"Miriã", g:"exodo", d:1, r:"Êxodo 2; 15; Números 12", p:[
+  "Fiquei de longe, vigiando, para ver o que aconteceria com um cesto de junco.",
+  "Tive a coragem de oferecer à filha do rei uma ama de leite que era a própria mãe do menino.",
+  "Peguei um tamboril e conduzi as mulheres em dança e cântico depois da travessia.",
+  "Falei contra meu irmão por causa da mulher que ele tomou, e fiquei leprosa sete dias.",
+  "Sou irmã de Moisés e de Arão, e a Bíblia me chama de profetisa."
+]},
+{n:"Eleazar", g:"exodo", d:3, r:"Números 20; 27; Josué 14", p:[
+  "Sou filho do primeiro sumo sacerdote, e tive dois irmãos que morreram diante do Senhor.",
+  "Recebi as vestes do meu pai no alto de um monte, no dia em que ele morreu.",
+  "Mandei bater os incensários dos rebeldes em lâminas para cobrir o altar.",
+  "Estive ao lado de Josué na repartição da terra entre as tribos.",
+  "Sucedi Arão como sumo sacerdote de Israel."
+]},
+{n:"Bezalel", g:"exodo", d:3, r:"Êxodo 31; 35—38", p:[
+  "Sou da tribo de Judá, e Deus me chamou pelo nome para uma obra.",
+  "Fui cheio do Espírito de Deus em sabedoria, entendimento e conhecimento.",
+  "Trabalhei ouro, prata, bronze, pedras e madeira.",
+  "Tive um ajudante chamado Aoliabe, da tribo de Dã.",
+  "Construí a arca da aliança e tudo o que havia no tabernáculo."
+]},
+{n:"Hur", g:"exodo", d:3, r:"Êxodo 17; 24; 31", p:[
+  "Subi ao alto do outeiro com dois homens enquanto a batalha corria embaixo.",
+  "Enquanto as mãos se erguiam, Israel vencia; quando baixavam, Amaleque prevalecia.",
+  "Segurei um dos braços de Moisés até o pôr do sol.",
+  "Fiquei encarregado do povo com Arão quando Moisés subiu ao monte.",
+  "Meu neto Bezalel construiu o tabernáculo."
+]},
+{n:"Nadabe", g:"exodo", d:3, r:"Levítico 10", p:[
+  "Sou filho do sumo sacerdote e subi ao monte entre os setenta anciãos.",
+  "Fui consagrado com meu pai e meus irmãos para o serviço do santuário.",
+  "Peguei meu incensário e ofereci diante do Senhor o que ele não havia ordenado.",
+  "Saiu fogo de diante do Senhor e me consumiu junto com meu irmão Abiú.",
+  "Meu pai Arão calou-se, e não me foi permitido pranto dentro do acampamento."
+]},
+
+/* ---------- JUÍZES E INÍCIO DA MONARQUIA ---------- */
+{n:"Débora", g:"juizes", d:1, r:"Juízes 4—5", p:[
+  "Eu me assentava debaixo de uma palmeira, entre Ramá e Betel.",
+  "O povo subia até mim para que eu julgasse as suas causas.",
+  "Chamei um homem e lhe disse que Deus já havia dado a ordem de subir ao monte Tabor.",
+  "Ele só foi se eu fosse junto, e por isso a honra da vitória coube a uma mulher.",
+  "Sou a profetisa que julgou Israel e cantou depois da derrota de Sísera."
+]},
+{n:"Golias", g:"juizes", d:1, r:"1 Samuel 17", p:[
+  "Sou de Gate, e minha altura passava de seis côvados e um palmo.",
+  "Minha lança tinha a haste como eixo de tecelão.",
+  "Desafiei o exército inimigo por quarenta dias, de manhã e de tarde.",
+  "Zombei do menino que veio contra mim com um cajado, como se eu fosse cachorro.",
+  "Caí de bruços com uma pedra fincada na testa, e minha própria espada me decepou a cabeça."
+]},
+{n:"Jônatas", g:"juizes", d:1, r:"1 Samuel 14; 18—20", p:[
+  "Subi um desfiladeiro de gatinhas com meu escudeiro, dizendo que ao Senhor não custa salvar com muitos ou com poucos.",
+  "Comi mel do favo sem saber do juramento do meu pai, e quase morri por isso.",
+  "Tirei minha túnica, minha espada e meu arco e dei a um homem mais novo do que eu.",
+  "Atirei flechas no campo como sinal combinado, para avisar meu amigo de que fugisse.",
+  "Meu pai era Saul, e minha amizade com Davi ficou famosa em toda a Escritura."
+]},
+{n:"Baraque", g:"juizes", d:2, r:"Juízes 4—5", p:[
+  "Fui chamado de Quedes-Naftali para uma missão que já vinha de Deus.",
+  "Reuni dez mil homens no monte Tabor.",
+  "Só aceitei ir se uma mulher fosse comigo, e ela me disse que a honra não seria minha.",
+  "Desci contra novecentos carros de ferro e o Senhor os desbaratou.",
+  "Cantei com Débora o cântico da vitória sobre Sísera."
+]},
+{n:"Abimeleque", g:"juizes", d:2, r:"Juízes 9", p:[
+  "Convenci os homens da cidade da minha mãe com o argumento de que era osso deles.",
+  "Matei setenta irmãos sobre uma só pedra, e só um escapou.",
+  "Meu irmão mais novo subiu ao monte Gerizim e contou a parábola das árvores que queriam um rei.",
+  "Pus fogo na torre de Siquém com mil pessoas dentro.",
+  "Uma mulher jogou uma pedra de moinho da torre e me quebrou o crânio; pedi que meu escudeiro me matasse para não dizerem que morri por mão de mulher."
+]},
+{n:"Otniel", g:"juizes", d:3, r:"Josué 15; Juízes 3", p:[
+  "Tomei uma cidade chamada Quiriate-Sefer e ganhei com isso uma esposa.",
+  "Minha mulher pediu ao pai dela fontes de água além do campo do sul.",
+  "Sou sobrinho e genro de Calebe.",
+  "O Espírito do Senhor veio sobre mim e venci o rei da Mesopotâmia.",
+  "Sou o primeiro juiz de Israel, e a terra teve descanso quarenta anos."
+]},
+{n:"Sangar", g:"juizes", d:3, r:"Juízes 3; 5", p:[
+  "Sou filho de Anate, e apareço em dois versículos apenas.",
+  "Vim logo depois de Eúde, o canhoto.",
+  "Não tinha espada nem lança: usei uma aguilhada de tocar bois.",
+  "Matei seiscentos filisteus com essa ferramenta de lavoura.",
+  "O cântico de Débora diz que nos meus dias os caminhos estavam desertos."
+]},
+{n:"Sísera", g:"juizes", d:3, r:"Juízes 4—5", p:[
+  "Fui capitão do exército de Jabim, rei de Canaã.",
+  "Tinha novecentos carros de ferro e oprimi Israel por vinte anos.",
+  "Desci do carro e fugi a pé quando o Senhor desbaratou o meu exército.",
+  "Pedi água e me deram leite, e adormeci coberto na tenda.",
+  "Jael pegou uma estaca e um martelo e me pregou a cabeça no chão."
+]},
+{n:"Mefibosete", g:"juizes", d:3, r:"2 Samuel 4; 9; 19", p:[
+  "Tinha cinco anos quando chegou a notícia da morte do meu pai e do meu avô.",
+  "Minha ama fugiu comigo, eu caí, e fiquei aleijado dos dois pés.",
+  "Vivi escondido numa casa em Lo-Debar.",
+  "Fui chamado à mesa do rei e comi ali todos os dias, como um dos filhos dele.",
+  "Sou filho de Jônatas, e Davi me tratou bem por causa da aliança com meu pai."
+]},
+
+/* ---------- REIS ---------- */
+{n:"Absalão", g:"reis", d:1, r:"2 Samuel 13—18", p:[
+  "Esperei dois anos calado antes de vingar a desonra da minha irmã.",
+  "Ficava à porta da cidade dizendo às pessoas que, se eu fosse juiz, faria justiça a elas.",
+  "Roubei o coração dos homens de Israel e me proclamei rei em Hebrom.",
+  "Meu cabelo era pesado, e eu o cortava uma vez por ano.",
+  "Fiquei pendurado num carvalho pela cabeça, e Joabe me atravessou com três dardos."
+]},
+{n:"Roboão", g:"reis", d:2, r:"1 Reis 12; 2 Crônicas 10", p:[
+  "Herdei o trono do rei mais sábio que já houve.",
+  "O povo veio me pedir que aliviasse o jugo pesado do meu pai.",
+  "Ouvi os anciãos e depois ouvi os moços com quem eu havia crescido.",
+  "Respondi que meu dedo mínimo era mais grosso que os lombos do meu pai.",
+  "Por causa da minha resposta, dez tribos se rebelaram e o reino se dividiu."
+]},
+{n:"Jeroboão", g:"reis", d:2, r:"1 Reis 11—14", p:[
+  "Era servo de Salomão, encarregado dos que trabalhavam da casa de José.",
+  "Um profeta rasgou uma capa nova em doze pedaços e me deu dez.",
+  "Fugi para o Egito e voltei quando o velho rei morreu.",
+  "Fiz dois bezerros de ouro e disse ao povo que aquilo era demais subir a Jerusalém.",
+  "Ficou meu nome ligado ao pecado que fez Israel pecar."
+]},
+{n:"Joabe", g:"reis", d:3, r:"2 Samuel 3; 11; 18; 1 Reis 2", p:[
+  "Sou sobrinho do rei, filho de Zeruia, e comandei o exército dele.",
+  "Matei Abner na porta da cidade, fingindo falar em segredo.",
+  "Recebi a carta que mandava pôr um homem na frente da batalha e recuar dele.",
+  "Desobedeci à ordem de poupar o filho do rei e o matei pendurado no carvalho.",
+  "Fui morto agarrado às pontas do altar, por ordem de Salomão."
+]},
+{n:"Uzias", g:"reis", d:3, r:"2 Reis 15; 2 Crônicas 26", p:[
+  "Comecei a reinar aos dezesseis anos e reinei cinquenta e dois.",
+  "Inventei em Jerusalém máquinas de guerra para os muros e as torres.",
+  "Enquanto busquei ao Senhor, ele me fez prosperar; mas o coração se elevou.",
+  "Entrei no templo para queimar incenso, e oitenta sacerdotes me resistiram.",
+  "A lepra me subiu à testa ali mesmo, e morri leproso, isolado até o fim."
+]},
+{n:"Jeú", g:"reis", d:3, r:"2 Reis 9—10", p:[
+  "Um jovem profeta entrou onde eu estava, derramou azeite na minha cabeça e saiu correndo.",
+  "Meus companheiros puseram as capas debaixo dos meus pés e tocaram a trombeta.",
+  "A sentinela me reconheceu de longe pelo modo furioso de guiar o carro.",
+  "Mandei que jogassem uma rainha da janela, e os cavalos a pisaram.",
+  "Reuni os profetas de Baal com engano e acabei com eles em Israel."
+]},
+{n:"Joás", g:"reis", d:3, r:"2 Reis 11—12; 2 Crônicas 24", p:[
+  "Fui escondido com minha ama num quarto do templo por seis anos.",
+  "Minha tia me salvou da avó que matava toda a descendência real.",
+  "Fui coroado aos sete anos, com a coroa e o testemunho, entre trombetas.",
+  "Mandei fazer um cofre com um buraco na tampa para consertar a casa do Senhor.",
+  "Enquanto o sacerdote Joiada viveu, fiz o que era reto; depois dele, mandei apedrejar o filho dele."
+]},
+{n:"Manassés", g:"reis", d:3, r:"2 Reis 21; 2 Crônicas 33", p:[
+  "Subi ao trono com doze anos e reinei mais tempo que qualquer outro rei de Judá.",
+  "Reconstruí o que meu pai havia derrubado e pus um ídolo dentro da casa do Senhor.",
+  "Fiz passar meus filhos pelo fogo e me dei à adivinhação.",
+  "Fui levado com ganchos e algemas para a Babilônia.",
+  "Na prisão me humilhei diante do Deus dos meus pais, e ele me ouviu e me trouxe de volta."
+]},
+
+/* ---------- PROFETAS ---------- */
+{n:"Natã", g:"profetas", d:2, r:"2 Samuel 7; 12; 1 Reis 1", p:[
+  "Primeiro eu disse ao rei que fizesse tudo o que estava no coração dele, e naquela noite Deus me corrigiu.",
+  "Levei a promessa de uma casa que duraria para sempre.",
+  "Contei a história de um rico com muitos rebanhos e um pobre com uma só cordeirinha.",
+  "Apontei o dedo e disse: tu és o homem.",
+  "Ungi Salomão em Giom junto com o sacerdote Zadoque."
+]},
+{n:"Amós", g:"profetas", d:2, r:"Amós 1; 7", p:[
+  "Não sou profeta nem filho de profeta.",
+  "Era boiadeiro e cultivava sicômoros em Tecoa.",
+  "Vi um cesto de frutas de verão e um prumo na mão do Senhor.",
+  "O sacerdote de Betel mandou que eu fosse profetizar em outro lugar e comesse o pão de lá.",
+  "Escrevi que o juízo deve correr como as águas, e a justiça como ribeiro perene."
+]},
+{n:"Oseias", g:"profetas", d:3, r:"Oseias 1—3", p:[
+  "Deus me mandou fazer da minha própria casa um sinal para a nação.",
+  "Dei aos meus filhos nomes que anunciavam juízo: não amada, não meu povo.",
+  "Comprei de volta minha mulher por quinze peças de prata e um ômer e meio de cevada.",
+  "Escrevi que Deus quer misericórdia, e não sacrifício.",
+  "Casei com uma prostituta por ordem de Deus, para retratar Israel infiel."
+]},
+{n:"Miquéias", g:"profetas", d:3, r:"Miqueias 4—6", p:[
+  "Sou de Moresete e profetizei nos dias de Jotão, Acaz e Ezequias.",
+  "Um século depois, os anciãos citaram minhas palavras para defender Jeremias da morte.",
+  "Disse que Sião seria lavrada como um campo.",
+  "Escrevi que Deus pede de ti que pratiques a justiça, ames a misericórdia e andes humildemente.",
+  "Anunciei que de Belém Efrata sairia aquele que havia de reinar em Israel."
+]},
+{n:"Habacuque", g:"profetas", d:3, r:"Habacuque 1—3", p:[
+  "Meu livro não começa com pregação: começa com uma queixa a Deus.",
+  "Perguntei por que ele fica calado enquanto o ímpio devora o mais justo.",
+  "Subi à minha guarda e me pus sobre a torre para ver o que ele me responderia.",
+  "Ouvi que o justo viverá pela sua fé, palavra que Paulo repetiria depois.",
+  "Terminei dizendo que, mesmo sem figos, sem uvas e sem rebanho, eu me alegraria no Senhor."
+]},
+{n:"Ageu", g:"profetas", d:3, r:"Ageu 1—2", p:[
+  "Profetizei no segundo ano de Dario, rei da Pérsia.",
+  "Perguntei se era tempo de morarem em casas forradas enquanto uma casa estava deserta.",
+  "Disse que semeavam muito e colhiam pouco, e que o salário caía em saco furado.",
+  "Animei um governador chamado Zorobabel e um sumo sacerdote chamado Josué.",
+  "Meu tema foi um só: reconstruir o templo em Jerusalém."
+]},
+{n:"Zacarias", g:"profetas", d:3, r:"Zacarias 3—9", p:[
+  "Profetizei ao lado de Ageu, na volta do exílio.",
+  "Vi cavalos entre as murtas, um candelabro de ouro entre duas oliveiras e um rolo voante.",
+  "Vi o sumo sacerdote com vestes sujas e Satanás à sua direita para o acusar.",
+  "Ouvi que não é por força nem por violência, mas pelo Espírito do Senhor.",
+  "Anunciei o rei que viria justo e humilde, montado num jumentinho."
+]},
+{n:"Malaquias", g:"profetas", d:3, r:"Malaquias 1—4", p:[
+  "Meu nome quer dizer meu mensageiro.",
+  "Escrevi na forma de perguntas e respostas: eles diziam, e eu respondia.",
+  "Repreendi os sacerdotes por trazerem ao altar o animal cego e o coxo.",
+  "Falei em trazer os dízimos à casa do tesouro e em janelas abertas no céu.",
+  "Sou o último livro do Antigo Testamento, e anunciei a vinda de Elias antes do grande dia."
+]},
+{n:"Geazi", g:"profetas", d:3, r:"2 Reis 4—5; 8", p:[
+  "Fui moço de um profeta e corri à frente com o bordão dele sobre o rosto de um menino.",
+  "Quis afastar uma mulher aflita que se lançara aos pés do meu senhor.",
+  "Corri atrás de um general sírio depois que ele foi curado.",
+  "Menti duas vezes: para ele, pedindo prata e vestidos, e para o meu senhor, dizendo que não fora a lugar nenhum.",
+  "A lepra de Naamã se pegou a mim e à minha descendência para sempre."
+]},
+
+/* ---------- MULHERES DA BÍBLIA ---------- */
+{n:"Dalila", g:"mulheres", d:1, r:"Juízes 16", p:[
+  "Morava no vale de Soreque.",
+  "Cinco príncipes me ofereceram mil e cem peças de prata cada um.",
+  "Fui enganada três vezes: cordas verdes, cordas novas e teias do tear.",
+  "Insisti todos os dias, até que a alma dele se angustiou até a morte.",
+  "Adormeci Sansão nos meus joelhos e mandei rapar as sete tranças da cabeça dele."
+]},
+{n:"Marta", g:"mulheres", d:1, r:"Lucas 10; João 11", p:[
+  "Recebi Jesus na minha casa e me distraí com muito serviço.",
+  "Reclamei que minha irmã tinha me deixado sozinha e pedi que ele a mandasse ajudar.",
+  "Ouvi que só uma coisa é necessária, e que ela havia escolhido a boa parte.",
+  "Quando meu irmão morreu, disse a Jesus que, se ele estivesse ali, aquilo não teria acontecido.",
+  "Fui eu quem avisou que já cheirava mal, pois era o quarto dia de Lázaro no sepulcro."
+]},
+{n:"Maria Madalena", g:"mulheres", d:1, r:"Lucas 8; João 20", p:[
+  "Sou de uma cidade da Galileia, à beira do lago.",
+  "Jesus expulsou de mim sete demônios, e eu passei a servi-lo com meus bens.",
+  "Fiquei junto à cruz quando quase todos tinham fugido.",
+  "Cheguei ao sepulcro ainda escuro e achei a pedra removida.",
+  "Pensei que fosse o jardineiro, até que ele me chamou pelo nome."
+]},
+{n:"Jezabel", g:"mulheres", d:1, r:"1 Reis 18—21; 2 Reis 9", p:[
+  "Era filha de Etbaal, rei dos sidônios.",
+  "Sustentava à minha mesa quatrocentos e cinquenta profetas de Baal.",
+  "Mandei recado a Elias jurando que no dia seguinte ele estaria morto.",
+  "Escrevi cartas em nome do rei para que dois homens falsos acusassem Nabote e ele fosse apedrejado.",
+  "Pintei os olhos e me pus à janela; fui jogada dali abaixo e os cães me comeram."
+]},
+{n:"Rebeca", g:"mulheres", d:1, r:"Gênesis 24—27", p:[
+  "Desci à fonte com o cântaro ao ombro e dei de beber também aos camelos.",
+  "Perguntaram-me se eu iria com aquele homem, e eu respondi que sim.",
+  "Os meninos lutavam dentro de mim, e o Senhor me disse que o mais velho serviria ao mais novo.",
+  "Cobri os braços do meu filho com peles de cabrito e o vesti com as roupas do irmão.",
+  "Sou mulher de Isaque e mãe de Esaú e Jacó."
+]},
+{n:"Isabel", g:"mulheres", d:1, r:"Lucas 1", p:[
+  "Sou das filhas de Arão, e meu marido era sacerdote do turno de Abias.",
+  "Éramos justos diante de Deus, mas já idosos e sem filhos.",
+  "Fiquei escondida cinco meses depois que concebi.",
+  "Quando minha parenta me saudou, a criança saltou de alegria no meu ventre.",
+  "Insisti na hora de dar o nome ao meu filho: ele se chamará João."
+]},
+{n:"Agar", g:"mulheres", d:2, r:"Gênesis 16; 21", p:[
+  "Sou egípcia, e servi na casa de uma mulher estéril.",
+  "Quando concebi, minha senhora ficou desprezível aos meus olhos, e fugi para o deserto.",
+  "O anjo me achou junto a uma fonte no caminho de Sur e me mandou voltar.",
+  "Chamei a Deus pelo nome de Aquele que me vê.",
+  "Fui despedida com um odre de água e chorei ao ver meu filho Ismael morrendo de sede."
+]},
+{n:"Lia", g:"mulheres", d:2, r:"Gênesis 29—30; 49", p:[
+  "Meus olhos eram baços, e minha irmã era formosa de porte e de semblante.",
+  "Meu pai me pôs no lugar dela na noite do casamento.",
+  "Deus viu que eu era desprezada e abriu a minha madre.",
+  "Dei nomes aos meus filhos contando a minha dor: agora meu marido me amará.",
+  "Fui mãe de Judá e de Levi, e estou sepultada na caverna de Macpela com Jacó."
+]},
+{n:"Abigail", g:"mulheres", d:2, r:"1 Samuel 25", p:[
+  "Era mulher de bom entendimento, casada com um homem duro e mau.",
+  "Um moço veio me avisar às pressas do que meu marido tinha respondido.",
+  "Carreguei duzentos pães, dois odres de vinho, cinco ovelhas e bolos de passas sem dizer nada a ele.",
+  "Impedi um derramamento de sangue falando ao homem que descia armado com quatrocentos.",
+  "Meu marido Nabal morreu dez dias depois, e eu me tornei mulher de Davi."
+]},
+{n:"Mical", g:"mulheres", d:3, r:"1 Samuel 18—19; 2 Samuel 6", p:[
+  "Meu pai me deu em casamento esperando que eu fosse um laço para o meu marido.",
+  "O dote pedido foram cem prepúcios de filisteus, e ele trouxe duzentos.",
+  "Desci meu marido por uma janela e pus um ídolo na cama com pelos de cabra à cabeceira.",
+  "Fui dada a outro homem, que me seguiu chorando até Baurim.",
+  "Olhei pela janela e o desprezei no coração por dançar diante da arca; e não tive filhos até morrer."
+]},
+{n:"Dorcas", g:"mulheres", d:3, r:"Atos 9", p:[
+  "Meu nome em aramaico é Tabita, e em grego quer dizer gazela.",
+  "Morava em Jope e era cheia de boas obras e esmolas.",
+  "Adoeci e morri, e me lavaram e puseram no cenáculo.",
+  "As viúvas choravam mostrando as túnicas e vestes que eu havia feito.",
+  "Pedro mandou todos saírem, orou de joelhos e me disse: levanta-te."
+]},
+{n:"Priscila", g:"mulheres", d:3, r:"Atos 18; Romanos 16", p:[
+  "Saí de Roma porque Cláudio mandou que todos os judeus deixassem a cidade.",
+  "Trabalhava com meu marido no mesmo ofício de Paulo: fazer tendas.",
+  "Fomos com ele até Éfeso e ficamos ali.",
+  "Ouvimos um homem eloquente pregar com fervor e o tomamos à parte para lhe expor o caminho com mais exatidão.",
+  "Paulo diz que eu e Áquila expusemos nossa cabeça pela vida dele, e que a igreja se reunia na nossa casa."
+]},
+
+/* ---------- EVANGELHOS ---------- */
+{n:"Lázaro", g:"evangelhos", d:1, r:"João 11—12", p:[
+  "Morava em Betânia com duas irmãs.",
+  "Adoeci, e as minhas irmãs mandaram dizer: aquele a quem amas está enfermo.",
+  "Ele demorou dois dias de propósito, e eu já estava sepultado havia quatro.",
+  "Saí do sepulcro com as mãos e os pés atados e o rosto envolto num lenço.",
+  "Depois quiseram me matar também, porque muitos criam por minha causa."
+]},
+{n:"Nicodemos", g:"evangelhos", d:1, r:"João 3; 7; 19", p:[
+  "Era fariseu e um dos principais dos judeus.",
+  "Fui procurá-lo de noite e comecei dizendo que sabíamos que ele viera da parte de Deus.",
+  "Perguntei como alguém pode nascer sendo velho, se não pode voltar ao ventre da mãe.",
+  "Depois defendi na assembleia que a lei não julga um homem sem primeiro o ouvir.",
+  "Levei quase cem arráteis de mirra e aloés para o sepultamento dele."
+]},
+{n:"Barrabás", g:"evangelhos", d:1, r:"Mateus 27; Lucas 23", p:[
+  "Estava preso com outros que tinham feito uma sedição na cidade.",
+  "Era conhecido do povo como um preso notável.",
+  "Havia sido preso por homicídio numa revolta.",
+  "O governador ofereceu ao povo a escolha entre mim e outro, e a multidão gritou o meu nome.",
+  "Fui solto na Páscoa, e Jesus foi crucificado no meu lugar."
+]},
+{n:"André", g:"evangelhos", d:1, r:"João 1; 6; 12", p:[
+  "Fui primeiro discípulo de outro mestre, que apontou e disse: eis o Cordeiro de Deus.",
+  "Fiquei com ele naquele dia, porque era quase a hora décima.",
+  "A primeira coisa que fiz foi achar meu próprio irmão e levá-lo a Jesus.",
+  "Fui eu que reparei no menino com cinco pães e dois peixinhos.",
+  "Sou irmão de Simão Pedro e pescador da Galileia."
+]},
+{n:"Caifás", g:"evangelhos", d:2, r:"Mateus 26; João 11; 18", p:[
+  "Era sumo sacerdote naquele ano, e genro de Anás.",
+  "Disse ao conselho que eles nada sabiam.",
+  "Profetizei sem saber que estava profetizando.",
+  "Falei que convinha que um homem morresse pelo povo, para que a nação não perecesse.",
+  "Rasguei as minhas vestes e disse que ele havia blasfemado."
+]},
+{n:"José de Arimateia", g:"evangelhos", d:2, r:"Mateus 27; Marcos 15; João 19", p:[
+  "Era homem rico e membro do conselho, mas não havia consentido no plano deles.",
+  "Esperava o reino de Deus, e era discípulo às escondidas por medo dos judeus.",
+  "Cheguei ousadamente diante do governador e pedi o corpo.",
+  "Envolvi o corpo num lençol limpo de linho.",
+  "Pus o corpo no sepulcro novo que eu havia mandado abrir na rocha para mim mesmo."
+]},
+{n:"Bartimeu", g:"evangelhos", d:3, r:"Marcos 10", p:[
+  "Sou filho de Timeu, e o evangelho registra o meu nome, o que é raro para alguém como eu.",
+  "Ficava assentado à beira do caminho, na saída de Jericó.",
+  "Muitos me repreendiam para que eu me calasse, e eu gritava ainda mais alto.",
+  "Ele mandou me chamar; larguei a capa, dei um salto e fui ter com ele.",
+  "Perguntou o que eu queria, e eu respondi: Mestre, que eu recupere a vista."
+]},
+{n:"Natanael", g:"evangelhos", d:3, r:"João 1; 21", p:[
+  "Sou de Caná da Galileia.",
+  "Meu amigo veio me dizer que tinha achado aquele de quem Moisés escreveu.",
+  "Respondi com uma pergunta que virou provérbio: de Nazaré pode sair coisa boa?",
+  "Ele disse que me viu debaixo da figueira antes que Filipe me chamasse.",
+  "Confessei ali mesmo: tu és o Filho de Deus, tu és o Rei de Israel."
+]},
+{n:"Simão de Cirene", g:"evangelhos", d:3, r:"Marcos 15; Lucas 23", p:[
+  "Vinha do campo e apenas passava por ali.",
+  "Sou de uma cidade do norte da África.",
+  "Os soldados me constrangeram a fazer uma coisa que eu não havia escolhido.",
+  "Marcos registra que sou pai de Alexandre e de Rufo.",
+  "Carreguei a cruz atrás de Jesus no caminho para o Calvário."
+]},
+
+/* ---------- ATOS E AS CARTAS ---------- */
+{n:"Silas", g:"atos", d:2, r:"Atos 15—16", p:[
+  "Fui escolhido pelos apóstolos para levar a carta do concílio às igrejas.",
+  "Paulo me tomou como companheiro depois de se separar de Barnabé.",
+  "Fui açoitado e preso comigo os pés no tronco.",
+  "Por volta da meia-noite eu orava e cantava louvores, e os presos me ouviam.",
+  "O terremoto abriu as portas, e o carcereiro perguntou o que era preciso fazer para se salvar."
+]},
+{n:"Filipe", g:"atos", d:3, r:"Atos 6; 8", p:[
+  "Fui um dos sete escolhidos para servir às mesas.",
+  "Preguei em Samaria, e houve grande alegria naquela cidade.",
+  "Um anjo me mandou para um caminho deserto, ao sul.",
+  "Corri ao lado de um carro e perguntei se o homem entendia o que estava lendo.",
+  "Batizei o eunuco etíope e fui arrebatado dali para Azoto."
+]},
+{n:"Gamaliel", g:"atos", d:3, r:"Atos 5; 22", p:[
+  "Era fariseu e doutor da lei, respeitado por todo o povo.",
+  "Mandei que os apóstolos fossem postos fora por um pouco.",
+  "Lembrei o conselho de dois homens que se levantaram antes e cujos seguidores se dispersaram.",
+  "Disse que, se aquela obra fosse de homens, se desfaria; mas se fosse de Deus, não a poderiam desfazer.",
+  "Paulo declarou que foi criado aos meus pés, instruído na lei dos pais."
+]},
+{n:"Simão", g:"atos", d:3, r:"Atos 8", p:[
+  "Antes de o evangelho chegar, eu já enfeitiçava a cidade de Samaria.",
+  "Diziam de mim que eu era o grande poder de Deus.",
+  "Cri e fui batizado, e andava sempre com Filipe, admirado com os sinais.",
+  "Ofereci dinheiro aos apóstolos para receber aquele poder.",
+  "Pedro me respondeu que o meu dinheiro fosse comigo à perdição."
+]},
+{n:"Êutico", g:"atos", d:3, r:"Atos 20", p:[
+  "Era moço e estava assentado numa janela.",
+  "Havia muitas lâmpadas no cenáculo do terceiro andar.",
+  "O sermão se estendeu até a meia-noite, e o sono me venceu.",
+  "Caí do terceiro andar e me levantaram morto.",
+  "Paulo desceu, se inclinou sobre mim e disse que a minha alma estava em mim."
+]},
+{n:"Matias", g:"atos", d:3, r:"Atos 1", p:[
+  "Estive com eles todo o tempo em que o Senhor andou entre nós.",
+  "Acompanhei desde o batismo de João até o dia em que ele foi elevado.",
+  "Éramos dois nomes propostos: eu e José, chamado Barsabás.",
+  "Oraram para que Deus mostrasse qual dos dois havia escolhido.",
+  "Deitaram sortes, a sorte caiu sobre mim, e fui contado com os onze apóstolos."
+]},
+{n:"Onésimo", g:"atos", d:3, r:"Filemom", p:[
+  "Servia na casa de um homem em Colossos e fugi de lá.",
+  "Meu nome quer dizer útil, e Paulo brincou dizendo que eu tinha sido inútil.",
+  "Fui achado em Roma e me tornei filho de Paulo nas suas prisões.",
+  "Paulo escreveu que, se eu devia alguma coisa, que fosse posto na conta dele.",
+  "Voltei ao meu senhor levando uma carta que pedia que eu fosse recebido não mais como servo, mas como irmão amado."
+]},
+{n:"Agripa", g:"atos", d:3, r:"Atos 25—26", p:[
+  "Cheguei a Cesareia com Berenice, com muito aparato, para saudar o governador.",
+  "Disse que também eu gostaria de ouvir aquele homem.",
+  "Ouvi o preso contar a história da luz no caminho de Damasco.",
+  "Perguntaram-me se eu cria nos profetas, e eu respondi que por pouco me persuadia a ser cristão.",
+  "Comentei com Festo que aquele homem podia ter sido solto se não tivesse apelado para César."
+]}
 ];
 
 /* ---------------------------------------------------------
