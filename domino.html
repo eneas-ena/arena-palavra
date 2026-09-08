@@ -243,7 +243,7 @@
    v1.0.0
    ========================================================= */
 
-const VERSAO = "2.4.1";
+const VERSAO = "3.0.1";
 const CORES_JOGADOR = ["#D4565F", "#C9A227", "#2A5B9C", "#2E6B4F"];
 const PIPS = {0:[],1:[4],2:[0,8],3:[0,4,8],4:[0,2,6,8],5:[0,2,4,6,8],6:[0,2,3,5,6,8]};
 
@@ -463,16 +463,24 @@ function novaMao(){
   jogo.dormeQtd = jogo.dorme.length;
 
   if(online()){
-    // só a mão do outro vai para o outro; a minha nunca sai daqui
-    recado({tipo:"maos", mao: cfg.jogadores[1].mao, qtdDele: cfg.jogadores[0].mao.length,
+    // no canal comum vai só o que é público: quantas pedras cada um tem
+    recado({tipo:"maos",
+            tamanhos: cfg.jogadores.map(j => j.mao.length),
             dorme: jogo.dorme.length, comeca: quem, rodada: jogo.mao,
             alvo: cfg.alvo, batida: cfg.batida, pecas: cfg.pecas, comprar: cfg.comprar,
             pontos: cfg.jogadores.map(j => j.pontos),
             nomes: cfg.jogadores.map(j => j.nome)});
-    /* Depois de mandar, o dono esquece a mão do outro. Ele precisou
-       conhecê-la por um instante para distribuir; guardá-la seria
-       deixar aberta a porta que este jogo inteiro serve para fechar. */
-    cfg.jogadores[1].mao = Array(cfg.jogadores[1].mao.length).fill(null);
+
+    /* A mão de cada um vai pelo canal privado dele, e só ele escuta.
+       O dono guarda a mão numa variável, esquece na mesma linha e manda
+       a cópia. Se esquecesse depois do envio, o envio é assíncrono e a
+       mão ficaria na memória dele até a resposta voltar. */
+    for(let i = 1; i < cfg.jogadores.length; i++){
+      const mao = cfg.jogadores[i].mao;
+      cfg.jogadores[i].mao = Array(mao.length).fill(null);
+      Sala.falarCom(i, {tipo:"minhaMao", mao});
+    }
+    somasTrancou = {};
   }
 
   jogo.ultimoJogador = null;
@@ -648,6 +656,19 @@ function desenharMao(){
   const podeTocar = minhaSempre ? souDaVez() && jogo.fase === "jogar"
                                 : j.tipo === "humano" && jogo.fase === "jogar";
 
+  /* A mão chega pelo canal privado, que é separado do canal comum: por
+     um instante o aparelho já sabe que a partida começou mas ainda não
+     recebeu as próprias pedras. Aqui ele espera em vez de quebrar. */
+  if(minhaSempre && j.mao.some(pc => !pc)){
+    const aviso = document.createElement("p");
+    aviso.className = "legenda";
+    aviso.style.margin = "auto";
+    aviso.textContent = "Recebendo as suas pedras…";
+    cx.appendChild(aviso);
+    $("#botoes").style.display = "none";
+    return;
+  }
+
   if(!minhaSempre && !podeTocar){
     const aviso = document.createElement("p");
     aviso.className = "legenda";
@@ -794,9 +815,9 @@ function encaixar(indice, lado){
           avisar("A batida falhou. A peça continua com você.");
           jogo.fase = "jogar";
           if(online()){
-            // a vez muda aqui: sem avisar, os dois ficam se esperando
-            recado({tipo:"vezPassa"});
-            jogo.vez = 1 - meuIndice();
+            // a vez muda aqui: sem avisar, todos ficam se esperando
+            recado({tipo:"vezPassa", de: meuIndice()});
+            jogo.vez = proximo(meuIndice());
             return depois(seguirVez);
           }
           return setTimeout(passarAdiante, 900);
@@ -858,15 +879,15 @@ function assentar(indice, lado){
   assentarPeca(pc, lado, jogo.vez);
 
   if(online()){
-    recado({tipo:"joga", pc, lado, restam: j.mao.length});
+    recado({tipo:"joga", pc, lado, restam: j.mao.length, de: meuIndice()});
     if(j.mao.length === 0){
       const pontos = BATIDAS[tipo || "simples"].pontos;
-      recado({tipo:"bateu", batida: tipo || "simples", pontos});
+      recado({tipo:"bateu", batida: tipo || "simples", pontos, de: meuIndice()});
       redesenhar();
       return setTimeout(() => fecharMaoOnline(meuIndice(), tipo || "simples", pontos), 700);
     }
     jogo.fase = "jogar";
-    jogo.vez = 1 - meuIndice();
+    jogo.vez = proximo(meuIndice());
     redesenhar();
     avisar("Você jogou " + pc[0] + "-" + pc[1] + ".");
     return depois(seguirVez);
@@ -891,11 +912,11 @@ function comprar(){
       const pc = jogo.dorme.pop();
       jogo.dormeQtd = jogo.dorme.length;
       cfg.jogadores[meuIndice()].mao.push(pc);
-      recado({tipo:"dorme", n: jogo.dorme.length});
+      recado({tipo:"dorme", n: jogo.dorme.length, de: meuIndice()});
       Som.toque(); redesenhar();
       return avisar("Você comprou " + pc[0] + "-" + pc[1] + ". Restam " + jogo.dormeQtd + " no dorme.");
     }
-    recado({tipo:"compra"});
+    recado({tipo:"compra", de: meuIndice()});
     return avisar("Pedindo uma peça do dorme…");
   }
   if(jogo.dorme.length === 0) return;
@@ -915,14 +936,9 @@ function passar(){
 
   if(online()){
     avisar("Você passou a vez.");
-    recado({tipo:"passa"});
-    if(jogo.passesSeguidos >= 2){
-      const soma = cfg.jogadores[meuIndice()].mao.reduce((s, p) => s + valor(p), 0);
-      recado({tipo:"soma", valor:soma, de:meuIndice()});
-      if(souODono()) guardarSoma(meuIndice(), soma);
-      return;
-    }
-    jogo.vez = 1 - meuIndice();
+    recado({tipo:"passa", de: meuIndice()});
+    if(jogo.passesSeguidos >= quantos()) return anunciarSoma();
+    jogo.vez = proximo(meuIndice());
     return depois(seguirVez);
   }
 
@@ -1065,41 +1081,58 @@ function fimDaPartida(){
 }
 
 /* ---------------------------------------------------------
-   SALA — mão escondida e um dorme compartilhado
+   SALA — mão escondida, dorme compartilhado, dois a quatro jogadores
 
-   Cada aparelho guarda a própria mão e nunca a envia. Quem abre a
-   sala distribui as pedras, manda ao outro apenas a mão dele, e fica
-   com o dorme: quando o outro precisa comprar, pede e recebe uma peça.
+   O canal comum é uma transmissão: tudo que se manda nele, todos
+   ouvem. Serve para o que é público — a peça que foi para a mesa,
+   quem passou, quantas pedras restam no dorme.
 
-   Recados: maos, joga, compra, peca, passa, bateu, soma, trancou.
-   Toda resposta do dono sai fora da trava de eco, senão morre ali.
+   O que é segredo de um jogador só viaja pelo canal privado dele:
+   a mão que recebe na distribuição e a peça que compra do dorme.
+   Assim o Jogador 3 não fica sabendo o que o Jogador 2 tem na mão.
+
+   Quem abre a sala distribui e guarda o dorme. Depois de distribuir,
+   esquece a mão dos outros.
    --------------------------------------------------------- */
 
 function online(){ return Sala.ativa(); }
 function souODono(){ return Sala.meuLugar === 0; }
 function meuIndice(){ return online() ? Sala.meuLugar : jogo.vez; }
 function souDaVez(){ return !online() || jogo.vez === meuIndice(); }
+function quantos(){ return cfg.jogadores.length; }
+function proximo(v){ return (v + 1) % quantos(); }
 function recado(m){ if(online()) Sala.publicar(m); }
 function depois(f){ setTimeout(f, 0); }
+
+let somasTrancou = {};
 
 function receberRecado(m){
   if(!m || !m.tipo) return;
 
+  /* ---------- distribuição ---------- */
   if(m.tipo === "maos"){
     cfg.alvo = m.alvo; cfg.batida = m.batida;
-    cfg.pecas = m.pecas; cfg.comprar = m.comprar; cfg.qtd = 2;
+    cfg.pecas = m.pecas; cfg.comprar = m.comprar;
+    cfg.qtd = m.nomes.length;
     montarPreparo();
-    cfg.jogadores.forEach((j, i) => { j.tipo = "humano"; j.pontos = m.pontos[i]; });
-    cfg.jogadores[0].nome = m.nomes[0]; cfg.jogadores[1].nome = m.nomes[1];
-    jogo = jogo || {mao:1};
+    cfg.jogadores.forEach((j, i) => {
+      j.tipo = "humano";
+      j.nome = m.nomes[i];
+      j.pontos = m.pontos[i];
+      j.mao = Array(m.tamanhos[i]).fill(null);   // ninguém sabe a mão de ninguém
+    });
+    jogo = jogo || {};
     jogo.mao = m.rodada;
-    cfg.jogadores[1].mao = m.mao;                  // a minha, que sou o segundo
-    cfg.jogadores[0].mao = Array(m.qtdDele).fill(null);
-    jogo.dorme = [];                                // o dorme fica com o dono
+    jogo.dorme = [];
     jogo.dormeQtd = m.dorme;
     jogo.mesa = []; jogo.pontas = [null, null];
     jogo.vez = m.comeca; jogo.fase = "jogar";
     jogo.escolhida = null; jogo.passesSeguidos = 0;
+    somasTrancou = {};
+    if(jogo.minhaMaoGuardada){                    // a mão chegou antes
+      cfg.jogadores[meuIndice()].mao = jogo.minhaMaoGuardada;
+      jogo.minhaMaoGuardada = null;
+    }
     UI.trocarTela("telaJogo");
     $("#desfecho").innerHTML = "";
     redesenhar();
@@ -1107,30 +1140,43 @@ function receberRecado(m){
     return depois(seguirVez);
   }
 
+  /* ---------- a minha mão, pelo canal privado ---------- */
+  if(m.tipo === "minhaMao"){
+    if(!jogo){ jogo = {minhaMaoGuardada:m.mao}; return; }
+    if(!cfg.jogadores[meuIndice()]){ jogo.minhaMaoGuardada = m.mao; return; }
+    cfg.jogadores[meuIndice()].mao = m.mao;
+    redesenhar();
+    if(souDaVez() && jogo.fase === "jogar") depois(seguirVez);
+    return;
+  }
+
   if(!jogo) return;
 
+  /* ---------- jogada ---------- */
   if(m.tipo === "joga"){
-    const outro = 1 - meuIndice();
-    assentarPeca(m.pc, m.lado, outro);
-    cfg.jogadores[outro].mao = Array(m.restam).fill(null);
+    assentarPeca(m.pc, m.lado, m.de);
+    cfg.jogadores[m.de].mao = Array(m.restam).fill(null);
     jogo.passesSeguidos = 0;
     redesenhar();
-    avisar(cfg.jogadores[outro].nome + " jogou " + m.pc[0] + "-" + m.pc[1] + ".");
-    if(m.restam === 0) return;                      // o recado "bateu" vem em seguida
-    jogo.vez = meuIndice(); jogo.fase = "jogar";
+    avisar(cfg.jogadores[m.de].nome + " jogou " + m.pc[0] + "-" + m.pc[1] + ".");
+    if(m.restam === 0) return;                    // o recado "bateu" vem em seguida
+    jogo.vez = proximo(m.de);
+    jogo.fase = "jogar";
     return depois(seguirVez);
   }
 
-  if(m.tipo === "compra"){                          // só o dono responde
+  /* ---------- compra ---------- */
+  if(m.tipo === "compra"){
     if(!souODono()) return;
     return depois(() => {
+      if(!jogo.dorme.length) return;
       const pc = jogo.dorme.pop();
       jogo.dormeQtd = jogo.dorme.length;
-      const outro = 1 - meuIndice();
-      cfg.jogadores[outro].mao.push(null);
-      recado({tipo:"peca", pc, dorme: jogo.dorme.length});
+      cfg.jogadores[m.de].mao.push(null);
+      Sala.falarCom(m.de, {tipo:"peca", pc, dorme: jogo.dorme.length});
+      recado({tipo:"dorme", n: jogo.dorme.length, de: m.de});
       redesenhar();
-      avisar(cfg.jogadores[outro].nome + " comprou uma peça.");
+      avisar(cfg.jogadores[m.de].nome + " comprou uma peça.");
     });
   }
 
@@ -1143,26 +1189,26 @@ function receberRecado(m){
     return;
   }
 
-  if(m.tipo === "dorme"){ jogo.dormeQtd = m.n; redesenhar(); return; }
+  if(m.tipo === "dorme"){
+    jogo.dormeQtd = m.n;
+    if(m.de !== undefined && m.de !== meuIndice() && cfg.jogadores[m.de])
+      cfg.jogadores[m.de].mao.push(null);
+    redesenhar();
+    return;
+  }
 
+  /* ---------- passe ---------- */
   if(m.tipo === "vezPassa"){
-    const outro = 1 - meuIndice();
-    avisar(cfg.jogadores[outro].nome + " ia bater mas errou a pergunta.");
-    jogo.vez = meuIndice(); jogo.fase = "jogar";
+    avisar(cfg.jogadores[m.de].nome + " ia bater mas errou a pergunta.");
+    jogo.vez = proximo(m.de); jogo.fase = "jogar";
     return depois(seguirVez);
   }
 
   if(m.tipo === "passa"){
     jogo.passesSeguidos++;
-    const outro = 1 - meuIndice();
-    avisar(cfg.jogadores[outro].nome + " passou a vez.");
-    if(jogo.passesSeguidos >= 2){
-      const soma = cfg.jogadores[meuIndice()].mao.reduce((s, p) => s + valor(p), 0);
-      recado({tipo:"soma", valor:soma, de:meuIndice()});
-      if(souODono()) guardarSoma(meuIndice(), soma);
-      return;
-    }
-    jogo.vez = meuIndice(); jogo.fase = "jogar";
+    avisar(cfg.jogadores[m.de].nome + " passou a vez.");
+    if(jogo.passesSeguidos >= quantos()) return anunciarSoma();
+    jogo.vez = proximo(m.de); jogo.fase = "jogar";
     return depois(seguirVez);
   }
 
@@ -1171,26 +1217,24 @@ function receberRecado(m){
     return guardarSoma(m.de, m.valor);
   }
 
-  if(m.tipo === "trancou"){
-    return fecharMaoOnline(m.vencedor, "trancou", m.pontos);
-  }
-
-  if(m.tipo === "bateu"){
-    const outro = 1 - meuIndice();
-    return fecharMaoOnline(outro, m.batida, m.pontos);
-  }
-
-  if(m.tipo === "novaMao"){
-    return receberRecado(Object.assign({}, m.maos, {tipo:"maos"}));
-  }
+  if(m.tipo === "trancou") return fecharMaoOnline(m.vencedor, "trancou", m.pontos);
+  if(m.tipo === "bateu")   return fecharMaoOnline(m.de, m.batida, m.pontos);
 }
 
-let somasTrancou = {};
+/* mesa trancada: cada um declara quanto tem na mão, o dono decide */
+function anunciarSoma(){
+  const minha = cfg.jogadores[meuIndice()].mao.reduce((s, p) => s + valor(p), 0);
+  recado({tipo:"soma", valor:minha, de:meuIndice()});
+  if(souODono()) guardarSoma(meuIndice(), minha);
+}
+
 function guardarSoma(quem, valorSoma){
   somasTrancou[quem] = valorSoma;
-  if(Object.keys(somasTrancou).length < 2) return;
-  const a = somasTrancou[0], b = somasTrancou[1];
-  const vencedor = a <= b ? 0 : 1;
+  if(Object.keys(somasTrancou).length < quantos()) return;
+  let vencedor = 0, menor = Infinity;
+  for(let i = 0; i < quantos(); i++){
+    if(somasTrancou[i] < menor){ menor = somasTrancou[i]; vencedor = i; }
+  }
   somasTrancou = {};
   depois(() => {
     recado({tipo:"trancou", vencedor, pontos: BATIDAS.trancou.pontos});
@@ -1200,6 +1244,7 @@ function guardarSoma(quem, valorSoma){
 
 function fecharMaoOnline(vencedor, tipo, pontos){
   jogo.fase = "fim-mao";
+  somasTrancou = {};
   cfg.jogadores[vencedor].pontos += pontos;
   const batida = BATIDAS[tipo] || BATIDAS.simples;
   Som.chegou();
@@ -1237,12 +1282,28 @@ function fecharMaoOnline(vencedor, tipo, pontos){
 UI.iniciar({ titulo:"Dominó", versao:VERSAO, regras:REGRAS, voltar:"index.html" });
 
 Sala.montarPainel($("#painelSala"), {
-  jogoId: "domino", lugares: 2,
+  jogoId: "domino", lugares: 4,
   retratar: () => null,               // aqui não se publica estado, só recados
   aplicar: (m) => receberRecado(m),
-  aoMudarGente: (n) => { if(jogo && jogo.fase !== "fim" && n < 2) avisar("O outro aparelho saiu da sala."); },
+  aoMudarGente: (n) => {
+    if(Sala.souDono && !jogo && n >= 1){
+      cfg.qtd = Math.max(2, Math.min(4, n));
+      montarPreparo();
+      cfg.jogadores.forEach((j, i) => {
+        j.tipo = "humano";
+        if(/Máquina|Você/.test(j.nome)) j.nome = "Jogador " + (i + 1);
+      });
+      montarPreparo();
+      $("#btnComecar").textContent = "Começar (" + n + " na sala)";
+    }
+    if(jogo && jogo.fase !== "fim" && n < 2) avisar("Um aparelho saiu da sala.");
+  },
+  aoMudarLugar: (lugar) => {
+    $("#btnComecar").textContent = lugar === 0 ? "Começar (você distribui)"
+                                               : "Esperando o comando do jogador 1";
+    $("#btnComecar").disabled = lugar !== 0;
+  },
   aoLigar: (lugar) => {
-    cfg.qtd = 2;
     montarPreparo();
     cfg.jogadores.forEach((j, i) => {
       j.tipo = "humano";

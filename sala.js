@@ -15,7 +15,7 @@
    não existe tabela nenhuma, não há o que ler nem o que estragar.
    Para trocar de projeto, mude as duas linhas.
    ---------------------------------------------------------
-   sala.js v1.4.0
+   sala.js v1.6.0
    ========================================================= */
 "use strict";
 
@@ -49,8 +49,10 @@ const Sala = {
   meuLugar: null,
   meuId: null,
   lista: [],
+  assinados: {},
+  meuSeq: 0,
+  recebidoDe: {},
   nomes: [],
-  versao: 0,
   souDono: false,
   ligada: false,
   ganchos: {},
@@ -110,6 +112,7 @@ const Sala = {
       realtime: { params: { eventsPerSecond: 20 } }
     });
     let canal = null;
+    const privados = {};
     return {
       abrir(codigo, aoReceber, aoMudarGente){
         canal = cliente.channel("arena-" + codigo, { config: { broadcast: { self:false }, presence: { key: String(Math.random()).slice(2) } } });
@@ -143,7 +146,33 @@ const Sala = {
         });
       },
       enviar(evento, dados){ if(canal) canal.send({ type:"broadcast", event:evento, payload:dados }); },
-      fechar(){ if(canal){ canal.unsubscribe(); canal = null; } }
+
+      /* Canal privado: um por jogador. O aparelho assina o canal do
+         próprio lugar; quem envia assina também, só para poder falar.
+         Quem não assinou não recebe — é assim que a mão de um jogador
+         não chega aos olhos dos outros. */
+      abrirPrivado(nome, aoReceber){
+        if(privados[nome]) return Promise.resolve();
+        const c = cliente.channel(nome, { config: { broadcast: { self:false } } });
+        c.on("broadcast", { event: "recado" }, ({payload}) => aoReceber(payload));
+        privados[nome] = c;
+        return new Promise((pronto, falhou) => {
+          const prazo = setTimeout(() => falhou(new Error("canal privado não confirmou")), 12000);
+          c.subscribe((status, erro) => {
+            if(status === "SUBSCRIBED"){ clearTimeout(prazo); pronto(); }
+            else if(status === "CHANNEL_ERROR" || status === "TIMED_OUT"){
+              clearTimeout(prazo); falhou(new Error(erro ? erro.message : status));
+            }
+          });
+        });
+      },
+      enviarPrivado(nome, dados){
+        if(privados[nome]) privados[nome].send({ type:"broadcast", event:"recado", payload:dados });
+      },
+      fechar(){
+        if(canal){ canal.unsubscribe(); canal = null; }
+        Object.keys(privados).forEach(k => { privados[k].unsubscribe(); delete privados[k]; });
+      }
     };
   },
 
@@ -161,13 +190,15 @@ const Sala = {
   async abrir({codigo, jogoId, lugares, dono, ganchos}){
     this.meuId = Math.random().toString(36).slice(2) + Date.now().toString(36);
     this.lista = dono ? [this.meuId] : [];
+    this.assinados = {};
+    this.meuSeq = 0;
+    this.recebidoDe = {};
     this.codigo = codigo;
     this.jogoId = jogoId;
     this.lugares = lugares || 2;
     this.souDono = !!dono;
     this.meuLugar = dono ? 0 : 1;
     this.ganchos = ganchos || {};
-    this.versao = 0;
 
     if(!this.transporte){
       await this.carregarBiblioteca();
@@ -188,6 +219,10 @@ const Sala = {
       });
 
     this.ligada = true;
+    /* Só o dono já sabe o próprio lugar. O convidado entra com um
+       palpite e o lugar de verdade chega depois — assinar antes disso
+       o faria escutar o canal privado de outro jogador. */
+    if(dono) await this.assinarPrivado(0);
     // quem entra depois se apresenta: pede o estado e um lugar na mesa
     if(!dono) this.transporte.enviar("pedido", {id:this.meuId});
   },
@@ -198,7 +233,32 @@ const Sala = {
     this.codigo = null;
     this.meuLugar = null;
     this.lista = [];
-    this.versao = 0;
+    this.assinados = {};
+    this.meuSeq = 0;
+    this.recebidoDe = {};
+  },
+
+  /* ---------- canais privados ----------
+     Cada aparelho escuta apenas o canal do próprio lugar. Serve para o
+     que não pode ser transmitido a todos: a mão de um jogador de dominó,
+     a peça que ele compra do dorme. */
+  nomePrivado(lugar){ return "arena-" + this.codigo + "-p" + lugar; },
+
+  async assinarPrivado(lugar){
+    if(!this.ligada || !this.transporte.abrirPrivado) return;
+    if(this.assinados[lugar]) return;
+    this.assinados[lugar] = true;
+    try {
+      await this.transporte.abrirPrivado(this.nomePrivado(lugar),
+        (msg) => { if(this.ganchos.aoReceberEstado) this.ganchos.aoReceberEstado(msg); });
+    } catch(e){ this.assinados[lugar] = false; throw e; }
+  },
+
+  /* manda algo só para um jogador */
+  async falarCom(lugar, dados){
+    if(!this.ligada) return;
+    await this.assinarPrivado(lugar);
+    this.transporte.enviarPrivado(this.nomePrivado(lugar), dados);
   },
 
   /* quantos aparelhos a sala já reconhece */
@@ -208,17 +268,16 @@ const Sala = {
      PUBLICAR E RECEBER
      ========================================================= */
 
-  /* O número da mensagem é um relógio lógico: ele nunca anda para trás
-     e sobe acima de tudo que já se viu. Se os dois aparelhos publicarem
-     no mesmo número, ganha o de lugar menor — assim os dois convergem
-     para o mesmo estado em vez de descartarem a mensagem um do outro
-     e ficarem esperando eternamente. */
+  /* Cada aparelho numera as próprias mensagens, e quem recebe guarda o
+     último número visto de cada remetente. Antes eu usava um número só,
+     compartilhado: com dois aparelhos funcionava, mas com três o recado
+     de um terceiro caía por parecer atrasado, e a partida travava. */
   publicar(estado){
     if(!this.ligada) return;
-    this.versao++;
+    this.meuSeq = (this.meuSeq || 0) + 1;
     this.transporte.enviar("estado", {
       jogoId: this.jogoId,
-      versao: this.versao,
+      seq: this.meuSeq,
       lugar: this.meuLugar,
       estado
     });
@@ -246,9 +305,11 @@ const Sala = {
     if(msg.lugares){
       this.lista = msg.lugares.slice();
       const meu = this.lista.indexOf(this.meuId);
-      if(meu >= 0 && meu !== this.meuLugar){
+      if(meu >= 0){
+        const mudou = meu !== this.meuLugar;
         this.meuLugar = meu;
-        if(this.ganchos.aoMudarLugar) this.ganchos.aoMudarLugar(meu);
+        this.assinarPrivado(meu);          // sempre, e não só quando muda
+        if(mudou && this.ganchos.aoMudarLugar) this.ganchos.aoMudarLugar(meu);
       }
       if(this.ganchos.aoMudarGente) this.ganchos.aoMudarGente(this.lista.length);
       return;
@@ -256,14 +317,11 @@ const Sala = {
 
     if(msg.jogoId && msg.jogoId !== this.jogoId) return;
 
-    if(typeof msg.versao === "number"){
-      const maisNova = msg.versao > this.versao;
-      const empateResolvido = msg.versao === this.versao
-        && typeof msg.lugar === "number" && msg.lugar < this.meuLugar;
-      // o relógio sobe mesmo quando a mensagem é descartada,
-      // senão os dois lados ficam presos no mesmo número
-      this.versao = Math.max(this.versao, msg.versao);
-      if(!maisNova && !empateResolvido) return;
+    // descarta só o que já veio deste mesmo remetente
+    if(typeof msg.seq === "number" && typeof msg.lugar === "number"){
+      const ultima = this.recebidoDe[msg.lugar] || 0;
+      if(msg.seq <= ultima) return;
+      this.recebidoDe[msg.lugar] = msg.seq;
     }
 
     if(this.ganchos.aoReceberEstado) this.ganchos.aoReceberEstado(msg.estado);
