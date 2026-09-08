@@ -188,7 +188,7 @@
    v1.0.0
    ========================================================= */
 
-const VERSAO = "1.1.0";
+const VERSAO = "1.2.0";
 const VIDAS = 6;
 
 const REGRAS = `
@@ -694,11 +694,23 @@ function publicar(){ Sala.enviar(); }
 UI.iniciar({ titulo:"Forca", versao:VERSAO, regras:REGRAS, voltar:"index.html" });
 
 Sala.montarPainel($("#painelSala"), {
-  jogoId: "forca", lugares: 2,
+  jogoId: "forca", lugares: 4,
   retratar: retratar, aplicar: aplicarEstado,
-  aoMudarGente: (n) => { if(jogo && !jogo.fim && n < 2) avisar("O outro aparelho saiu da sala."); },
+  aoMudarGente: (n) => {
+    // o dono ajusta o número de jogadores ao tanto de gente na sala
+    if(Sala.souDono && !jogo && n >= 1){
+      cfg.qtd = Math.max(1, Math.min(4, n));
+      montarPreparo();
+      $("#btnComecar").textContent = "Começar (" + n + " na sala)";
+    }
+    if(jogo && !jogo.fim && n < 2) avisar("Um aparelho saiu da sala.");
+  },
+  aoMudarLugar: (lugar) => {
+    $("#btnComecar").textContent = lugar === 0 ? "Começar (você comanda)"
+                                               : "Esperando o comando do jogador 1";
+    $("#btnComecar").disabled = lugar !== 0;
+  },
   aoLigar: (lugar) => {
-    cfg.qtd = 2;                    // numa sala jogam dois, um em cada aparelho
     montarPreparo();
     $("#btnComecar").textContent = lugar === 0 ? "Começar (você comanda)" : "Esperando o outro aparelho começar";
     $("#btnComecar").disabled = lugar !== 0;

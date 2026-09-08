@@ -180,7 +180,7 @@
    v1.0.0
    ========================================================= */
 
-const VERSAO = "1.6.0";
+const VERSAO = "1.7.0";
 
 /* Mesa maior exige pergunta mais curta, senão o texto não cabe na carta. */
 const MESAS = {
@@ -855,11 +855,23 @@ function receberDoOutro(d){
 UI.iniciar({ titulo:"Memória", versao:VERSAO, regras:REGRAS, voltar:"index.html" });
 
 Sala.montarPainel($("#painelSala"), {
-  jogoId: "memoria", lugares: 2,
+  jogoId: "memoria", lugares: 4,
   retratar: retratar, aplicar: receberDoOutro,
-  aoMudarGente: (n) => { if(jogo && jogo.fase !== "fim" && n < 2) avisar("O outro aparelho saiu da sala."); },
+  aoMudarGente: (n) => {
+    if(Sala.souDono && !jogo && n >= 1){
+      cfg.modo = String(Math.max(2, Math.min(4, n)));
+      montarPreparo();
+      $("#btnComecar").textContent = "Começar (" + n + " na sala)";
+    }
+    if(jogo && jogo.fase !== "fim" && n < 2) avisar("Um aparelho saiu da sala.");
+  },
+  aoMudarLugar: (lugar) => {
+    $("#btnComecar").textContent = lugar === 0 ? "Começar (você embaralha)"
+                                               : "Esperando o comando do jogador 1";
+    $("#btnComecar").disabled = lugar !== 0;
+  },
   aoLigar: (lugar) => {
-    cfg.modo = "2";
+    if(cfg.modo === "solo" || cfg.modo === "maquina") cfg.modo = "2";
     montarPreparo();
     $("#btnComecar").textContent = lugar === 0 ? "Começar (você embaralha)" : "Esperando o outro aparelho começar";
     $("#btnComecar").disabled = lugar !== 0;

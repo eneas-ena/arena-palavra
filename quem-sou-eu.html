@@ -158,7 +158,7 @@
    v1.0.0
    ========================================================= */
 
-const VERSAO = "1.1.0";
+const VERSAO = "1.2.0";
 const VALOR = [5, 4, 3, 2, 1];       // pontos conforme a pista em que você acerta
 const SUSPEITOS = 6;                  // nomes na lista de palpites
 
@@ -559,11 +559,22 @@ function publicar(){ Sala.enviar(); }
 UI.iniciar({ titulo:"Quem Sou Eu", versao:VERSAO, regras:REGRAS, voltar:"index.html" });
 
 Sala.montarPainel($("#painelSala"), {
-  jogoId: "quemsoueu", lugares: 2,
+  jogoId: "quemsoueu", lugares: 4,
   retratar: retratar, aplicar: aplicarEstado,
-  aoMudarGente: (n) => { if(jogo && jogo.fase !== "fim" && n < 2) avisar("O outro aparelho saiu da sala."); },
+  aoMudarGente: (n) => {
+    if(Sala.souDono && !jogo && n >= 1){
+      cfg.qtd = Math.max(1, Math.min(4, n));
+      montarPreparo();
+      $("#btnComecar").textContent = "Começar (" + n + " na sala)";
+    }
+    if(jogo && jogo.fase !== "fim" && n < 2) avisar("Um aparelho saiu da sala.");
+  },
+  aoMudarLugar: (lugar) => {
+    $("#btnComecar").textContent = lugar === 0 ? "Começar (você comanda)"
+                                               : "Esperando o comando do jogador 1";
+    $("#btnComecar").disabled = lugar !== 0;
+  },
   aoLigar: (lugar) => {
-    cfg.qtd = 2;
     montarPreparo();
     $("#btnComecar").textContent = lugar === 0 ? "Começar (você comanda)" : "Esperando o outro aparelho começar";
     $("#btnComecar").disabled = lugar !== 0;
